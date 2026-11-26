@@ -1,0 +1,65 @@
+@* Diálogo de configuración, escrito una sola vez y compartido por las dos cabeceras de la
+   intranet: `Shared/_Layout.cshtml` (la cabecera normal) y `Shared/_LayoutPanel.cshtml`
+   (la cabecera con el formato de panel que usa /dicom/lista-trabajo). Con esto el ⚙ no puede
+   desviarse entre las dos.
+   El bloque «Tema» se marca desde el servidor con el valor guardado en la cuenta
+   (`TemaPreferencias.Valor`), igual que se marca «General» cuando el tema era de este equipo: así la
+   ventana sale bien aunque el JavaScript no cargue. `js/preferencias.js` lo confirma con
+   GET /api/tema al abrir el diálogo y escribe con PUT /api/tema. *@
+@using Meditechnosys.Intranet.Services
+@inject IConfigStore Config
+@{
+    var temaCuenta = TemaPreferencias.Valor(Config, User.Identity?.Name);
+}
+<dialog class="pref" id="pref-dialog" aria-labelledby="pref-titulo">
+    <div class="pref-cab">
+        <h3 id="pref-titulo">Configuración</h3>
+        <button type="button" class="pref-cerrar" id="pref-cerrar" aria-label="Cerrar la configuración">×</button>
+    </div>
+
+    <fieldset class="pref-grupo">
+        <legend>Tema</legend>
+        <div class="pref-opciones" id="pref-tema">
+            <label><input type="radio" name="pref-tema" value="dark" checked="@(temaCuenta == TemaPreferencias.Oscuro ? "checked" : null)"><span>Oscuro</span></label>
+            <label><input type="radio" name="pref-tema" value="light" checked="@(temaCuenta == TemaPreferencias.Claro ? "checked" : null)"><span>Claro</span></label>
+        </div>
+        <p class="pref-nota">Se guarda en <b>tu cuenta</b>, no en este equipo: entras desde cualquier
+            pantalla del hospital y la ves como la dejaste. Vale para todas las pantallas de la intranet
+            y para los paneles. <b>Oscuro</b> es como abre por defecto.</p>
+    </fieldset>
+
+    <fieldset class="pref-grupo">
+        <legend>Tamaño de la letra</legend>
+        <div class="pref-opciones" id="pref-fuente">
+            <label><input type="radio" name="pref-fuente" value="chica"><span>Chica</span></label>
+            <label><input type="radio" name="pref-fuente" value="normal"><span>Normal</span></label>
+            <label><input type="radio" name="pref-fuente" value="grande"><span>Grande</span></label>
+        </div>
+        <p class="pref-nota">Se guarda en este equipo. Agranda el texto de las pantallas que abras después.</p>
+    </fieldset>
+
+    <fieldset class="pref-grupo">
+        <legend>Tiempo de sesión</legend>
+        <div class="pref-opciones" id="pref-sesion" aria-busy="true">
+            <p class="pref-nota">Cargando tu tiempo de sesión…</p>
+        </div>
+        <p class="pref-nota">Es lo que aguanta abierta la sesión <b>sin que hagas nada</b>; al cumplirse
+            pide de nuevo la contraseña. Se guarda en tu cuenta, no en este equipo.</p>
+    </fieldset>
+
+    <fieldset class="pref-grupo" id="pref-sistema" hidden>
+        <legend>Parámetros del módulo Gestión</legend>
+        <label class="pref-linea">Periodicidad de reporte de estatus (días)
+            <input type="number" id="pref-periodicidad" min="1" max="365" step="1" value="7">
+        </label>
+        <p class="pref-nota">Cada cuántos días debe entregar su reporte el ingeniero responsable, cuando la
+            asignación no indique otra periodicidad.</p>
+        <label class="pref-check"><input type="checkbox" id="pref-fechalimite">
+            <span>Habilitar fecha límite en actividades, incidentes y tickets</span></label>
+        <p class="pref-nota">Con la opción habilitada se puede fijar la fecha límite y lo abierto fuera de
+            tiempo se marca como vencido. Deshabilitada, la fecha límite no se pide, no se guarda ni se valida.</p>
+        <div class="pref-pie"><button type="button" class="pref-guardar" id="pref-guardar">Guardar parámetros</button></div>
+    </fieldset>
+
+    <p class="pref-estado" id="pref-estado" role="status" hidden></p>
+</dialog>

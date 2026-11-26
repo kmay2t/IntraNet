@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <script src="/js/theme.js?v=20261119e"></script>
+  <script src="/js/filtro.js?v=20261029a"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DICOM — Buscar y descargar</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --panel: #ffffff;
+      --panel-2: #f7f4ea;
+      --borde: #d9d9d9;
+      --texto: #111111;
+      --suave: #555555;
+      --azul: #0d47a1;
+      --azul-t: #1565c0;
+      --dorado: #c9a227;
+      --dorado-t: #a8861d;
+      --error: #b3261e;
+      --card: rgba(255,255,255,.55);
+      --border: #d9d9d9;
+      --text: #111111;
+      --muted: #555555;
+      --accent: #0d47a1;
+      --accent-hover: #1565c0;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --err: #b3261e;
+      --row-hover: rgba(13, 71, 161, .06);
+      --selected: rgba(13, 71, 161, .1);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--texto);
+      padding: 16px;
+      min-height: 100vh;
+    }
+    .fondo-logo {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background: url("/img/logo-meditechnosys.png") center / contain no-repeat;
+      mix-blend-mode: multiply;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      margin: -16px -16px 16px;
+      background: #111111;
+      color: #ffffff;
+      padding: 13px 22px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 3px solid var(--dorado);
+      box-shadow: 0 2px 8px rgba(0,0,0,.28);
+      flex-wrap: wrap;
+    }
+    /* Logo IMSS retirado por solicitud: ya no se muestra el aguila en el encabezado. */
+    header h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: .02em;
+      color: var(--dorado);
+    }
+    header .logo-centro {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: var(--dorado);
+      pointer-events: none;
+      line-height: 1.3;
+      white-space: nowrap;
+      font-family: "Segoe UI", "Trebuchet MS", system-ui, sans-serif;
+      font-size: 21px;
+      font-weight: 700;
+      letter-spacing: .04em;
+    }
+    header .logo-centro span {
+      display: block;
+      font-size: 10px;
+      font-weight: 400;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      opacity: .85;
+      margin-top: 4px;
+    }
+    header .badge {
+      font-size: 12px;
+      color: #eeeeee;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    header .botones-nav {
+      display: flex;
+      gap: 8px;
+      margin-left: auto;
+    }
+    header .boton-nav {
+      background: var(--panel-2);
+      color: var(--texto);
+      border: 1px solid var(--borde);
+      padding: 6px 12px;
+      font-size: 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    header .boton-nav:hover {
+      background: var(--panel);
+    }
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--borde);
+      border-radius: 8px;
+      padding: 24px 26px;
+      margin-bottom: 16px;
+      max-width: 1200px;
+      margin: 0 auto 16px;
+      box-shadow: 0 1px 5px rgba(0,0,0,.12);
+      position: relative;
+      z-index: 1;
+    }
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--texto);
+      display: inline-block;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--dorado);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px 16px;
+    }
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: var(--suave);
+      font-weight: 600;
+    }
+    input, select {
+      width: 100%;
+      padding: 11px 12px;
+      border-radius: 6px;
+      border: 1px solid #9e9e9e;
+      background: #ffffff;
+      color: var(--texto);
+      font-size: 14px;
+      color-scheme: light;
+    }
+    input:focus, select:focus {
+      outline: 2px solid var(--dorado);
+      outline-offset: 1px;
+    }
+    .row-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+      align-items: center;
+    }
+    button {
+      font: inherit;
+      cursor: pointer;
+      border-radius: 6px;
+      padding: 10px 18px;
+      border: 1px solid var(--borde);
+    }
+    button:disabled {
+      opacity: .45;
+      cursor: default;
+    }
+    .btn-primary {
+      background: var(--azul);
+      border-color: var(--azul);
+      color: #fff;
+      font-weight: 700;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--azul-t); }
+    .btn-secondary {
+      background: #ffffff;
+      color: var(--texto);
+      border-color: #111111;
+    }
+    .btn-secondary:hover:not(:disabled) { background: var(--panel-2); }
+    .btn-download {
+      background: var(--ok);
+      border-color: var(--ok);
+      color: #052e16;
+      font-weight: 700;
+    }
+    .btn-download:hover:not(:disabled) { filter: brightness(1.08); }
+    /* Cancelar: rojo de peligro (theme.css lo ajusta según día/noche). */
+    .btn-cancel {
+      background: var(--error);
+      border-color: var(--error);
+      color: #fff;
+      font-weight: 700;
+    }
+    .btn-cancel:hover:not(:disabled) { filter: brightness(1.12); }
+    .hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td {
+      padding: 11px 12px;
+      text-align: left;
+      border-bottom: 1px solid #eceff1;
+      background: transparent;
+    }
+    th {
+      text-align: left;
+      font-size: 11px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: var(--suave);
+      padding: 10px 12px;
+      border-bottom: 2px solid var(--borde);
+      white-space: nowrap;
+      background: transparent;
+    }
+    tbody tr {
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    tbody tr:hover { background: var(--row-hover); }
+    tbody tr.selected { background: var(--selected); }
+    tbody tr:last-child td { border-bottom: none; }
+    .empty {
+      text-align: center;
+      padding: 28px 12px;
+      color: var(--suave);
+    }
+    #log {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.8rem;
+      max-height: 180px;
+      overflow-y: auto;
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      white-space: pre-wrap;
+      line-height: 1.45;
+    }
+    .log-ok { color: var(--ok); }
+    .log-err { color: var(--err); }
+    .log-warn { color: var(--warn); }
+    .log-info { color: var(--muted); }
+    .stats {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .stats strong { color: var(--text); }
+    .date-row {
+      display: flex;
+      gap: 10px;
+      align-items: end;
+      flex-wrap: wrap;
+    }
+    .date-row > div { flex: 1; min-width: 140px; }
+    .check-inline {
+      display: flex;
+      flex-direction: row;   /* casilla y nombre en la misma línea (label viene en columna) */
+      align-items: center;
+      gap: 6px;
+      margin-top: 22px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+    .check-inline input { width: auto; }
+
+    /* Progress bar (cada tarjeta de descarga usa .progress-track/.progress-fill) */
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+    }
+    .progress-header .pct {
+      font-weight: 700;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+    }
+    .progress-track {
+      height: 12px;
+      background: var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), #60a5fa);
+      border-radius: 999px;
+      transition: width 0.25s ease;
+    }
+    .progress-fill.indeterminate {
+      width: 40% !important;
+      animation: indet 1.2s ease-in-out infinite;
+    }
+    @keyframes indet {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(280%); }
+    }
+    .progress-detail {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    /* Varias descargas a la vez: cada trabajo es una tarjeta con su propia barra, su botón de
+       cancelar y sus enlaces al ZIP. */
+    #jobsPanel { display: none; margin-top: 14px; }
+    #jobsPanel.active { display: block; }
+    .job {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-top: 10px;
+      background: var(--bg);
+    }
+    .job.completa { border-color: var(--ok); }
+    .job.aviso { border-color: var(--warn); }
+    .job.fallo { border-color: var(--err); }
+    .job-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      font-size: 0.9rem;
+    }
+    .job-label { font-weight: 600; }
+    .job-pct { font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .job-detail { margin-top: 6px; font-size: 0.8rem; color: var(--muted); }
+    .job-avisos { margin-top: 8px; font-size: 0.8rem; color: var(--err); white-space: pre-wrap; }
+    .job-avisos.ok { color: var(--ok); }
+    .job-avisos.info { color: var(--muted); }
+    .job-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .job-actions button { padding: 6px 12px; font-size: 0.8rem; }
+    .zip-link {
+      display: inline-block;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      color: var(--accent);
+      text-decoration: none;
+      background: #ffffff;
+    }
+    .zip-link:hover { background: var(--row-hover); }
+  </style>
+  <link rel="stylesheet" href="/css/theme.css?v=20261120f" />
+  <link rel="stylesheet" href="/css/hoja-fecha.css?v=20261104c" />
+  <script src="/js/hoja-fecha.js?v=20261106a"></script>
+</head>
+<body class="theme-panel">
+  <header>
+    <h1>Búsqueda y descarga DICOM</h1>
+    <div class="logo-centro">Meditechnosys<span>Medical Technology Solutions</span></div>
+    <span class="badge" id="statusBadge">Conectando…</span>
+    <div class="botones-nav">
+      <button class="boton-nav" onclick="history.back()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Regresar
+      </button>
+      <button class="boton-nav" onclick="window.location.href='/'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        Home
+      </button>
+    </div>
+  </header>
+  <div class="fondo-logo" aria-hidden="true"></div>
+
+  <main class="page-wide">
+    <section class="card">
+      <h2>Criterios de búsqueda</h2>
+      <div class="grid">
+        <div>
+          <label for="patientId">Patient ID</label>
+          <input id="patientId" type="text" placeholder="Ej. 123456 (coincide parcial)" />
+        </div>
+        <div>
+          <label for="patientName">Nombre paciente</label>
+          <input id="patientName" type="text" placeholder="APELLIDO o APELLIDO^NOMBRE" />
+        </div>
+        <div>
+          <label for="modality">Modalidad</label>
+          <input id="modality" type="text" placeholder="CT, MR, DX, US…" />
+        </div>
+        <div>
+          <label for="accession">Accession Number</label>
+          <input id="accession" type="text" placeholder="" />
+        </div>
+      </div>
+
+      <div class="date-row" style="margin-top: 14px;">
+        <div>
+          <label for="dateFrom">Fecha desde</label>
+          <input id="dateFrom" type="date" />
+        </div>
+        <div>
+          <label for="dateTo">Fecha hasta</label>
+          <input id="dateTo" type="date" />
+        </div>
+        <label class="check-inline">
+          <input type="checkbox" id="dateRange" checked />
+          Usar rango de fechas
+        </label>
+      </div>
+
+      <div style="margin-top: 14px;">
+        <label>PACS / AE Title a consultar</label>
+        <div id="aeTitleList" class="date-row" style="margin-top:6px;">
+          <span class="hint">Cargando nodos…</span>
+        </div>
+      </div>
+
+      <div class="row-actions">
+        <button class="btn-primary" id="btnSearch">Buscar</button>
+        <button class="btn-secondary" id="btnToday">Hoy</button>
+        <button class="btn-secondary" id="btnClear">Limpiar</button>
+        <span class="hint">Enter = buscar · ID/nombre parcial coincide solo (sin escribir *) · usa "…" para coincidencia exacta</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+        <h2 style="margin:0;">Resultados</h2>
+        <div class="stats">
+          <span><strong id="countTotal">0</strong> encontrados</span>
+          <span id="statVisible" style="display:none;"><strong id="countVisible">0</strong> mostrados por el filtro</span>
+          <span><strong id="countSelected">0</strong> seleccionados</span>
+        </div>
+      </div>
+
+      <!-- Filtro sobre los estudios ya traídos del PACS (no vuelve a consultar). -->
+      <div class="row-actions" style="margin-top:0; margin-bottom:12px; align-items:flex-end;">
+        <label style="flex:1; min-width:280px;">
+          Filtrar resultados
+          <input id="filterResults" type="search" autocomplete="off"
+                 placeholder="Paciente, Patient ID, descripción, modalidad, fecha (aaaa-mm-dd) o nodo de origen…" />
+        </label>
+        <button class="btn-secondary" id="btnFilterClear" disabled>Quitar filtro</button>
+        <span class="hint">Filtra la lista que ya tienes en pantalla; no consulta de nuevo al PACS.</span>
+      </div>
+
+      <div class="row-actions" style="margin-top:0; margin-bottom:12px;">
+        <button class="btn-download" id="btnDownload" disabled>⬇ Descargar seleccionados</button>
+        <button class="btn-download" id="btnDownloadAll" disabled style="background:#0ea5e9;color:#042f2e;">⬇ Descargar TODOS los resultados</button>
+        <button class="btn-secondary" id="btnSelectAll">Seleccionar todos</button>
+        <button class="btn-secondary" id="btnSelectNone">Ninguno</button>
+        <button class="btn-secondary" id="btnCerrarTerminadas" disabled title="Quita de la pantalla las tarjetas de las descargas que ya terminaron. Los archivos y los ZIP del servidor no se tocan.">Ocultar terminadas</button>
+      </div>
+
+      <!-- Descargas en curso: se pueden lanzar varias sin esperar; cada una con su barra,
+           su botón de cancelar y sus ZIP. -->
+      <div id="jobsPanel">
+        <div class="progress-header">
+          <span id="jobsTitulo">Descargas en curso</span>
+          <span class="hint" id="jobsCupo"></span>
+        </div>
+        <div id="jobsList"></div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:36px;"></th>
+              <th>Paciente</th>
+              <th>Patient ID</th>
+              <th>Fecha</th>
+              <th>Descripción</th>
+              <th>Modalidad</th>
+              <th># Imágenes</th>
+              <th>Origen</th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+            <tr><td colspan="8" class="empty">Busca por fecha o paciente para ver estudios</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Estado</h2>
+      <div id="log"></div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    // «Fecha desde» y «fecha hasta» se eligen con la hoja compartida (/js/hoja-fecha.js):
+    // un cuadro que admite Día, Mes, Año y Rango. Escribe en #dateFrom/#dateTo, que es lo que
+    // lee buildStudyDate(), así que la casilla «Usar rango de fechas» y los botones «Hoy» y
+    // «Limpiar» siguen haciendo lo de siempre — la hoja se entera cuando la página escribe
+    // en los campos por su cuenta.
+    if (window.HojaFecha) {
+      HojaFecha.instalar({ desde: "dateFrom", hasta: "dateTo", titulo: "Periodo", cualquier: "Cualquier día" });
+    }
+
+    let studies = [];
+    let pacsNodes = [];
+
+    // Descargas simultáneas: jobId → { tarjeta, temporizador, estado }.
+    const descargas = new Map();
+    let cupo = 3;                    // cuántas se ejecutan a la vez (lo dice /api/dicom/status)
+    let verificacionActiva = true;   // si la intranet comprueba que llegó todo
+    let reintentos = 2;
+
+    function log(msg, type = "info") {
+      const el = $("log");
+      const line = document.createElement("div");
+      line.className = "log-" + type;
+      const t = new Date().toLocaleTimeString();
+      line.textContent = `[${t}] ${msg}`;
+      el.appendChild(line);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function toDicomDate(iso) {
+      if (!iso) return "";
+      return iso.replace(/-/g, "");
+    }
+
+    function formatDisplayDate(yyyymmdd) {
+      if (!yyyymmdd || yyyymmdd.length < 8) return yyyymmdd || "";
+      return `${yyyymmdd.slice(0,4)}-${yyyymmdd.slice(4,6)}-${yyyymmdd.slice(6,8)}`;
+    }
+
+    function buildStudyDate() {
+      const from = $("dateFrom").value;
+      const to = $("dateTo").value;
+      const useRange = $("dateRange").checked;
+      const f = toDicomDate(from);
+      const t = toDicomDate(to);
+      if (useRange) return (f && t) ? `${f}-${t}` : "";
+      return f || t || "";
+    }
+
+    function setToday() {
+      const d = new Date();
+      const iso = d.toISOString().slice(0, 10);
+      $("dateFrom").value = iso;
+      $("dateTo").value = iso;
+      $("dateRange").checked = true;
+    }
+
+    function renderAeTitleList() {
+      const el = $("aeTitleList");
+      if (pacsNodes.length === 0) {
+        el.innerHTML = '<span class="hint">No hay nodos PACS configurados (appsettings.json → PacsNodes)</span>';
+        return;
+      }
+      el.innerHTML = pacsNodes.map((n) => `
+        <label class="check-inline" style="margin-top:0;">
+          <input type="checkbox" class="aeChk" value="${escapeHtml(n.aeTitle)}" checked />
+          ${escapeHtml(n.name)} ${n.name !== n.aeTitle ? `(${escapeHtml(n.aeTitle)})` : ""}
+        </label>
+      `).join("");
+    }
+
+    function selectedAeTitles() {
+      const all = Array.from(document.querySelectorAll(".aeChk"));
+      const checked = all.filter(c => c.checked).map(c => c.value);
+      return checked.length === all.length ? [] : checked;
+    }
+
+    function updateCounts() {
+      const q = filterQuery();
+      const vis = visibleIndexes();
+      $("countTotal").textContent = studies.length;
+      $("countVisible").textContent = vis.length;
+      $("statVisible").style.display = q ? "" : "none";
+      $("btnFilterClear").disabled = !q;
+      const n = studies.filter(s => s.selected).length;
+      $("countSelected").textContent = n;
+      // Con filtro activo los botones globales se refieren a lo filtrado, no a toda la búsqueda.
+      $("btnDownloadAll").textContent = q
+        ? `⬇ Descargar los ${vis.length} filtrados`
+        : "⬇ Descargar TODOS los resultados";
+      $("btnSelectAll").textContent = q ? `Seleccionar ${vis.length} filtrados` : "Seleccionar todos";
+      // Ya no se bloquean mientras descarga otra cosa: se pueden lanzar varias descargas a la vez.
+      $("btnDownload").disabled = n === 0;
+      $("btnDownloadAll").disabled = vis.length === 0;
+      $("btnCerrarTerminadas").disabled = !hayTerminadas();
+    }
+
+    // ---- Filtro local de resultados (no vuelve a preguntar al PACS) ----
+
+    // La regla de normalización es la compartida de /js/filtro.js, la misma que usan las demás
+    // pantallas; así "MUÑOZ" y "MUNOZ" se buscan igual en todas partes.
+    const Busca = window.Filtro || { norm: (x) => String(x ?? "").toLowerCase() };
+    const normText = Busca.norm;
+
+    function filterQuery() {
+      return normText($("filterResults").value);
+    }
+
+    // Texto donde busca el filtro; se calcula una sola vez por estudio.
+    function studyHaystack(s) {
+      if (!s._hay) {
+        s._hay = normText([
+          s.patientName, s.patientId, s.studyDescription, s.modalitiesInStudy,
+          s.sourceName, s.sourceAeTitle, s.studyInstanceUid,
+          s.studyDate, formatDisplayDate(s.studyDate), s.numberOfInstances
+        ].join(" · "));
+      }
+      return s._hay;
+    }
+
+    function visibleIndexes() {
+      const q = filterQuery();
+      if (!q) return studies.map((_, i) => i);
+      const out = [];
+      for (let i = 0; i < studies.length; i++) {
+        if (studyHaystack(studies[i]).includes(q)) out.push(i);
+      }
+      return out;
+    }
+
+    const MAX_TABLE_ROWS = 500;
+
+    function renderTable() {
+      const tb = $("tbody");
+      if (studies.length === 0) {
+        tb.innerHTML = '<tr><td colspan="8" class="empty">Sin resultados</td></tr>';
+        updateCounts();
+        return;
+      }
+      const vis = visibleIndexes();
+      if (vis.length === 0) {
+        tb.innerHTML = `<tr><td colspan="8" class="empty">
+          Ningún estudio coincide con «${escapeHtml($("filterResults").value.trim())}».
+          Prueba con el apellido, el Patient ID, la modalidad o el nodo de origen.
+        </td></tr>`;
+        updateCounts();
+        return;
+      }
+      const shown = vis.slice(0, MAX_TABLE_ROWS);
+      let rows = shown.map(i => {
+        const s = studies[i];
+        return `
+        <tr class="${s.selected ? "selected" : ""}" data-i="${i}">
+          <td><input type="checkbox" ${s.selected ? "checked" : ""} data-i="${i}" class="chk" /></td>
+          <td>${escapeHtml(s.patientName)}</td>
+          <td>${escapeHtml(s.patientId)}</td>
+          <td>${formatDisplayDate(s.studyDate)}</td>
+          <td>${escapeHtml(s.studyDescription)}</td>
+          <td>${escapeHtml(s.modalitiesInStudy)}</td>
+          <td>${escapeHtml(s.numberOfInstances)}</td>
+          <td>${escapeHtml(s.sourceName || s.sourceAeTitle)}</td>
+        </tr>
+      `;
+      }).join("");
+      if (vis.length > MAX_TABLE_ROWS) {
+        rows += `<tr><td colspan="8" class="empty">
+          Mostrando ${MAX_TABLE_ROWS} de ${vis.length} estudios${filterQuery() ? " filtrados" : ""}.
+          Usa <strong>${filterQuery() ? "Descargar los filtrados" : "Descargar TODOS los resultados"}</strong>
+          para bajar los ${vis.length} sin seleccionar uno a uno.
+        </td></tr>`;
+      }
+      tb.innerHTML = rows;
+      updateCounts();
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    // ---------- Descargas: varias a la vez ----------
+    // Cada trabajo que se lanza (o que ya estaba corriendo cuando se abrió la página) recibe su
+    // propia tarjeta con barra, botón de cancelar y los enlaces a sus ZIP.
+
+    const FASE_TXT = {
+      queued: "En cola: hay otras descargas trabajando…",
+      retrieving: "Descargando del PACS…",
+      verifying: "Comprobando que llegó todo…",
+      retrying: "Re-pidiendo las imágenes que faltaron…",
+      zipping: "Empaquetando ZIP…"
+    };
+
+    function MB(bytes) {
+      const b = Number(bytes || 0);
+      return b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`;
+    }
+
+    function campo(obj, nombre, otro) {
+      return obj?.[nombre] ?? obj?.[otro] ?? "";
+    }
+
+    function nuevaTarjeta(jobId, etiqueta, estudios) {
+      $("jobsPanel").classList.add("active");
+      const raiz = document.createElement("div");
+      raiz.className = "job";
+      raiz.innerHTML = `
+        <div class="job-head">
+          <span class="job-label"></span>
+          <span class="job-pct">0%</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill"></div></div>
+        <div class="job-detail">Preparando…</div>
+        <div class="job-avisos"></div>
+        <div class="job-actions">
+          <button class="btn-cancel" data-acc="cancel">✕ Cancelar</button>
+          <button class="btn-secondary" data-acc="close" style="display:none">Ocultar</button>
+          <span class="job-zips"></span>
+        </div>`;
+      raiz.querySelector(".job-label").textContent =
+        etiqueta || `Descarga ${jobId}`;
+      const d = {
+        id: jobId,
+        etiqueta: etiqueta || `${estudios || 0} estudio(s)`,
+        nodo: raiz,
+        barra: raiz.querySelector(".progress-fill"),
+        pct: raiz.querySelector(".job-pct"),
+        detalle: raiz.querySelector(".job-detail"),
+        avisos: raiz.querySelector(".job-avisos"),
+        zips: raiz.querySelector(".job-zips"),
+        btnCancelar: raiz.querySelector('[data-acc="cancel"]'),
+        btnOcultar: raiz.querySelector('[data-acc="close"]'),
+        timer: null,
+        termino: false,
+        autoBajado: false
+      };
+      d.btnCancelar.onclick = () => cancelar(jobId);
+      d.btnOcultar.onclick = () => ocultar(jobId);
+      $("jobsList").prepend(raiz);
+      descargas.set(jobId, d);
+      pintarCupo();
+      return d;
+    }
+
+    function ocultar(jobId) {
+      const d = descargas.get(jobId);
+      if (!d || !d.termino) return;
+      if (d.timer) clearInterval(d.timer);
+      d.nodo.remove();
+      descargas.delete(jobId);
+      if (descargas.size === 0) $("jobsPanel").classList.remove("active");
+      updateCounts();
+    }
+
+    function ocultarTerminadas() {
+      Array.from(descargas.values())
+        .filter(d => d.termino)
+        .forEach(d => ocultar(d.id));
+    }
+
+    function vivas() {
+      return Array.from(descargas.values()).filter(d => !d.termino).length;
+    }
+
+    function hayTerminadas() {
+      return Array.from(descargas.values()).some(d => d.termino);
+    }
+
+    function pintarCupo() {
+      const vivos = vivas();
+      $("jobsTitulo").textContent = vivos > 0
+        ? `Descargas en curso (${vivos})`
+        : "Descargas terminadas";
+      $("jobsCupo").textContent =
+        `${cupo} a la vez · verificación ${verificacionActiva ? "activada" : "apagada"}` +
+        (verificacionActiva && reintentos > 0 ? ` · ${reintentos} reintento(s)` : "");
+      $("btnCerrarTerminadas").disabled = !hayTerminadas();
+    }
+
+    function pintarBarra(d, pct, indeterminado) {
+      const v = Math.max(0, Math.min(100, parseInt(pct, 10) || 0));
+      d.pct.textContent = v + "%";
+      if (indeterminado) {
+        d.barra.classList.add("indeterminate");
+        d.barra.style.width = "40%";
+      } else {
+        d.barra.classList.remove("indeterminate");
+        d.barra.style.width = v + "%";
+      }
+    }
+
+    async function search() {
+      const params = new URLSearchParams();
+      const pid = $("patientId").value.trim();
+      const pname = $("patientName").value.trim();
+      const mod = $("modality").value.trim();
+      const acc = $("accession").value.trim();
+      const studyDate = buildStudyDate();
+
+      if (pid) params.set("patientId", pid);
+      if (pname) params.set("patientName", pname);
+      if (mod) params.set("modalitiesInStudy", mod);
+      if (acc) params.set("accessionNumber", acc);
+      if (studyDate) params.set("studyDate", studyDate);
+      const aeSel = selectedAeTitles();
+      if (aeSel.length > 0) params.set("aeTitles", aeSel.join(","));
+
+      // Sin ningún criterio no se consulta el PACS (evitaría volcar miles de estudios).
+      if (!pid && !pname && !mod && !acc && !studyDate) {
+        log("Escribe al menos un criterio (ID, nombre, fecha, modalidad…) antes de buscar.", "err");
+        return;
+      }
+
+      $("btnSearch").disabled = true;
+      log(aeSel.length > 0
+        ? `Buscando en: ${aeSel.join(", ")}…`
+        : `Buscando en ${pacsNodes.length || "todos los"} nodo(s) PACS…`);
+      try {
+        const res = await fetch("/api/dicom/studies?" + params.toString());
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || err.error || res.statusText);
+        }
+        const data = await res.json();
+        studies = data.map(s => ({
+          patientName: s.patientName || s.PatientName || "",
+          patientId: s.patientId || s.PatientId || "",
+          studyDate: s.studyDate || s.StudyDate || "",
+          studyDescription: s.studyDescription || s.StudyDescription || "",
+          modalitiesInStudy: s.modalitiesInStudy || s.ModalitiesInStudy || "",
+          numberOfInstances: s.numberOfInstances || s.NumberOfInstances || "",
+          studyInstanceUid: s.studyInstanceUid || s.StudyInstanceUid || "",
+          sourceAeTitle: s.sourceAeTitle || s.SourceAeTitle || "",
+          sourceName: s.sourceName || s.SourceName || "",
+          selected: false
+        }));
+        log(`Búsqueda completada: ${studies.length} estudio(s)`, "ok");
+        renderTable();
+      } catch (e) {
+        log("Error: " + e.message, "err");
+        studies = [];
+        renderTable();
+      } finally {
+        $("btnSearch").disabled = false;
+      }
+    }
+
+    function parseExpected(n) {
+      const v = parseInt(String(n || "").trim(), 10);
+      return Number.isFinite(v) && v > 0 ? v : 0;
+    }
+
+    function buildItems(list) {
+      return list.map(s => ({
+        studyInstanceUid: s.studyInstanceUid,
+        aeTitle: s.sourceAeTitle || undefined,
+        expectedInstances: parseExpected(s.numberOfInstances) || undefined,
+        patientName: s.patientName || undefined,
+        studyDate: s.studyDate || undefined,
+        sourceName: s.sourceName || undefined
+      }));
+    }
+
+    // Resumen corto del trabajo, para distinguir las tarjetas cuando hay varias a la vez.
+    function etiquetaDe(items) {
+      const pacientes = [...new Set(items.map(i => (i.patientName || "").trim()).filter(Boolean))];
+      const nodos = [...new Set(items.map(i => i.sourceName || i.aeTitle || "").filter(Boolean))];
+      const t = [`${items.length} estudio(s)`];
+      if (pacientes.length === 1) t.push(pacientes[0]);
+      else if (pacientes.length > 1) t.push(`${pacientes[0]} y ${pacientes.length - 1} paciente(s) más`);
+      if (nodos.length) t.push(nodos.slice(0, 3).join("/") + (nodos.length > 3 ? "…" : ""));
+      return t.join(" · ");
+    }
+
+    // Lanza una descarga y le crea su tarjeta. NO espera a que termine: se pueden lanzar varias
+    // seguidas y el servidor pone en cola las que no caben.
+    async function iniciarDescarga(items) {
+      if (!items || items.length === 0) return;
+
+      if (items.length > 500) {
+        const ok = confirm(
+          `Vas a descargar ${items.length} estudios.\n\n` +
+          `• Puede tardar mucho (horas si son miles).\n` +
+          `• Al terminar la intranet cuenta las imágenes y re-pide las que falten.\n` +
+          `• El ZIP se divide en varias partes si la descarga es grande.\n` +
+          `• Puedes iniciar otras descargas sin esperar: las que no caben quedan en cola.\n\n` +
+          `¿Continuar?`
+        );
+        if (!ok) return;
+      }
+
+      const etiqueta = etiquetaDe(items);
+      try {
+        const res = await fetch("/api/dicom/studies/download/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || data.error || res.statusText);
+        const jobId = data.jobId || data.JobId;
+        if (!jobId) throw new Error("La API no devolvió jobId");
+
+        nuevaTarjeta(jobId, etiqueta, items.length);
+        log(`Descarga lanzada: ${etiqueta}. Puedes iniciar otra sin esperar.`, "ok");
+        vigilar(jobId);
+      } catch (e) {
+        log("No se pudo iniciar la descarga: " + e.message, "err");
+      }
+    }
+
+    // Detiene UN trabajo concreto; los demás siguen bajando.
+    async function cancelar(jobId) {
+      const d = descargas.get(jobId);
+      if (!d || d.termino) return;
+      const ok = confirm(
+        `¿Cancelar «${d.etiqueta}»?\n\n` +
+        `• Ya no se pedirán al PACS los estudios que faltan.\n` +
+        `• Las imágenes que ya llegaron se conservan en el servidor, pero no se generará ZIP.\n\n` +
+        `¿Cancelar de todos modos?`
+      );
+      if (!ok) return;
+
+      d.btnCancelar.disabled = true;
+      d.detalle.textContent = "Cancelando: se detendrán los estudios que faltaban…";
+      try {
+        const res = await fetch(`/api/dicom/studies/download/${jobId}/cancel`, { method: "POST" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || data.detail || res.statusText);
+        log("Cancelación solicitada para " + d.etiqueta, "warn");
+      } catch (e) {
+        log("No se pudo cancelar: " + e.message, "err");
+        d.btnCancelar.disabled = false;
+      }
+    }
+
+    // Pregunta el progreso cada medio segundo mientras el trabajo siga vivo.
+    function vigilar(jobId) {
+      const d = descargas.get(jobId);
+      if (!d) return;
+      const tick = async () => {
+        try {
+          const res = await fetch(`/api/dicom/studies/download/${jobId}/progress`);
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || res.statusText);
+          }
+          pintar(jobId, await res.json());
+        } catch (e) {
+          detener(d);
+          cerrarTarjeta(d, "failed", "No se pudo seguir el progreso: " + e.message, {});
+        }
+      };
+      tick();
+      d.timer = setInterval(tick, 500);
+    }
+
+    function detener(d) {
+      if (d.timer) { clearInterval(d.timer); d.timer = null; }
+    }
+
+    function pintar(jobId, p) {
+      const d = descargas.get(jobId);
+      if (!d) return;
+
+      const status = String(campo(p, "status", "Status") || "").toLowerCase();
+      const phase = campo(p, "phase", "Phase");
+      const pct = p.percent ?? p.Percent ?? 0;
+      const imgs = p.imagesSaved ?? p.ImagesSaved ?? 0;
+      const expected = p.imagesExpected ?? p.ImagesExpected ?? 0;
+      const sc = p.studiesCompleted ?? p.StudiesCompleted ?? 0;
+      const sr = p.studiesRequested ?? p.StudiesRequested ?? 0;
+
+      let detalle = `${sc}/${sr} estudios · ${imgs} imágenes`;
+      if (expected > 0) detalle += ` · ~${expected} esperadas`;
+      const textoFase = FASE_TXT[phase] || "";
+      d.detalle.textContent = textoFase ? `${textoFase} (${detalle})` : detalle;
+
+      if (status === "pending") {
+        // En cola: la barra quieta en 0 y el texto de arriba ya dice por qué.
+        pintarBarra(d, 0, false);
+        return;
+      }
+
+      const indeterminado = status === "running" && pct === 0 && imgs === 0;
+      pintarBarra(d, status === "completed" ? 100 : pct, indeterminado);
+
+      if (status === "completed" || status === "cancelled" || status === "failed") {
+        detener(d);
+        const mensaje = status === "failed"
+          ? String(campo(p, "error", "Error") || "Fallo de la descarga")
+          : "";
+        cerrarTarjeta(d, status, mensaje, p);
+      }
+    }
+
+    // Cierra una tarjeta: resultado de la verificación + enlaces al ZIP (una o varias partes).
+    function cerrarTarjeta(d, status, mensaje, p) {
+      if (d.termino) return;
+      d.termino = true;
+      d.btnCancelar.style.display = "none";
+      d.btnOcultar.style.display = "";
+      d.nodo.classList.add(
+        status === "completed" ? "completa" : status === "cancelled" ? "aviso" : "fallo");
+
+      const incompletos = p.incompleteStudies || p.IncompleteStudies || [];
+      const partes = p.zipParts || p.ZipParts || [];
+      const verificado = p.verified ?? p.Verified ?? false;
+      const imgs = p.imagesSaved ?? p.ImagesSaved ?? 0;
+      const sc = p.studiesCompleted ?? p.StudiesCompleted ?? 0;
+      const sr = p.studiesRequested ?? p.StudiesRequested ?? 0;
+      const ruta = p.outputPath || p.OutputPath || "";
+
+      if (status === "completed") {
+        d.pct.textContent = "100%";
+        if (incompletos.length === 0) {
+          d.avisos.className = "job-avisos ok";
+          d.avisos.textContent = verificado
+            ? `Verificado: llegaron las ${imgs} imágenes de los ${sc}/${sr} estudios.`
+            : `${sc}/${sr} estudios · ${imgs} imágenes.`;
+          log(`Terminada: ${d.etiqueta} — ${sc}/${sr} estudios, ${imgs} imágenes, todo completo.`, "ok");
+        } else {
+          const repeticiones = p.retriedStudies ?? p.RetriedStudies ?? 0;
+          const faltan = p.missingInstances ?? p.MissingInstances ?? 0;
+          d.avisos.className = "job-avisos";
+          d.avisos.textContent =
+            `Faltan ${faltan} imagen(es) en ${incompletos.length} estudio(s)` +
+            (repeticiones ? `, ${repeticiones} estudio(s) re-pedido(s) al PACS` : "") + ":\n" +
+            incompletos.slice(0, 6).map(resumenFaltante).join("\n") +
+            (incompletos.length > 6 ? `\n… y ${incompletos.length - 6} estudio(s) más.` : "") +
+            "\nVuelve a descargar solo esos estudios cuando puedas.";
+          log(`Terminada con avisos: ${d.etiqueta} — faltan ${faltan} imagen(es) en ${incompletos.length} estudio(s).`, "warn");
+        }
+        bajarZip(d, partes, imgs, ruta);
+      } else if (status === "cancelled") {
+        d.avisos.className = "job-avisos info";
+        d.avisos.textContent = `Cancelada: ${sc}/${sr} estudios y ${imgs} imágenes llegaron al servidor.` +
+          (ruta ? ` Archivos en: ${ruta}` : "") + " No se generó ZIP.";
+        log(`Cancelada: ${d.etiqueta} — ${imgs} imágenes quedaron en el servidor.`, "warn");
+      } else {
+        d.avisos.className = "job-avisos";
+        d.avisos.textContent = mensaje;
+        log(`Error en ${d.etiqueta}: ${mensaje}`, "err");
+      }
+      pintarCupo();
+      updateCounts();
+    }
+
+    function resumenFaltante(f) {
+      const uid = f.studyInstanceUid || f.StudyInstanceUid || "";
+      const nombre = f.patientName || f.PatientName || "";
+      const fecha = f.studyDate || f.StudyDate || "";
+      const esperado = f.expected ?? f.Expected ?? 0;
+      const recibido = f.received ?? f.Received ?? 0;
+      const quien = nombre ? `${nombre}${fecha ? " · " + fecha : ""}` : uid;
+      return `• ${quien}: ${recibido}/${esperado > 0 ? esperado : "?"} imágenes`;
+    }
+
+    // Pone los enlaces del ZIP y los baja uno tras otro.
+    function bajarZip(d, partes, imgs, ruta) {
+      if (!partes || partes.length === 0) {
+        d.avisos.textContent += imgs > 0
+            ? `\nSin ZIP: los archivos quedan en el servidor (${ruta}).`
+            : "\nNo llegó ninguna imagen del PACS.";
+        if (imgs === 0) log(`Sin imágenes en ${d.etiqueta}. Revisa que el AE esté registrado en el nodo de origen.`, "err");
+        return;
+      }
+
+      d.zips.innerHTML = "";
+      partes.forEach(pt => {
+        const a = document.createElement("a");
+        a.className = "zip-link";
+        a.href = pt.downloadUrl || pt.DownloadUrl || "#";
+        a.download = pt.fileName || pt.FileName || "dicom.zip";
+        a.textContent = partes.length > 1
+          ? `⬇ Parte ${pt.number ?? pt.Number}/${pt.total ?? pt.Total} (${MB(pt.bytes ?? pt.Bytes ?? 0)})`
+          : `⬇ Bajar ZIP (${MB(pt.bytes ?? pt.Bytes ?? 0)})`;
+        d.zips.appendChild(a);
+        d.zips.appendChild(document.createTextNode(" "));
+      });
+
+      if (d.autoBajado) return;
+      d.autoBajado = true;
+      // Se lanzan en secuencia, con margen, para que el navegador las ponga en orden en Descargas.
+      partes.forEach((pt, i) => setTimeout(() => {
+        const a = document.createElement("a");
+        a.href = pt.downloadUrl || pt.DownloadUrl;
+        a.download = pt.fileName || pt.FileName || "dicom.zip";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }, 600 + i * 1500));
+
+      log(partes.length > 1
+        ? `${d.etiqueta}: ZIP en ${partes.length} partes, se bajan solas (si el navegador pregunta, permite descargar varios archivos).`
+        : `${d.etiqueta}: ZIP listo, se baja a la carpeta Descargas.`, "ok");
+    }
+
+    async function download() {
+      await iniciarDescarga(buildItems(studies.filter(s => s.selected)));
+    }
+
+    async function downloadAll() {
+      // Con filtro activo se descargan los que el filtro deja ver, no toda la búsqueda.
+      await iniciarDescarga(buildItems(visibleIndexes().map(i => studies[i])));
+    }
+
+    // Retoma los trabajos que ya estaban corriendo: recargar la página no debe dejar una descarga
+    // sin su barra ni sin botón de cancelar.
+    async function retomarDescargas() {
+      try {
+        const res = await fetch("/api/dicom/studies/download/activos");
+        if (!res.ok) return;
+        const lista = await res.json();
+        let n = 0;
+        for (const p of (lista || [])) {
+          const id = p.jobId || p.JobId;
+          if (!id || descargas.has(id)) continue;
+          nuevaTarjeta(id, p.label || p.Label || "", p.studiesRequested ?? p.StudiesRequested ?? 0);
+          vigilar(id);
+          n++;
+        }
+        if (n > 0) log(`Se retomaron ${n} descarga(s) que ya estaban en curso.`, "info");
+      } catch { /* la versión anterior de la API no tiene este endpoint */ }
+    }
+
+    $("btnSearch").onclick = search;
+    $("btnToday").onclick = () => { setToday(); };
+    $("btnClear").onclick = () => {
+      $("patientId").value = "";
+      $("patientName").value = "";
+      $("modality").value = "";
+      $("accession").value = "";
+      $("dateFrom").value = "";
+      $("dateTo").value = "";
+    };
+    $("btnDownload").onclick = download;
+    $("btnDownloadAll").onclick = downloadAll;
+    $("btnCerrarTerminadas").onclick = ocultarTerminadas;
+    $("dateRange").addEventListener("change", () => {
+      if (!$("dateRange").checked) {
+        $("dateFrom").value = "";
+        $("dateTo").value = "";
+      }
+    });
+    $("btnSelectAll").onclick = () => {
+      // Con filtro: marca lo que el filtro deja ver; sin filtro: marca todo.
+      visibleIndexes().forEach(i => studies[i].selected = true);
+      renderTable();
+    };
+    $("btnSelectNone").onclick = () => {
+      studies.forEach(s => s.selected = false);
+      renderTable();
+    };
+
+    // El filtro se aplica sobre la lista ya cargada, al teclear.
+    $("filterResults").addEventListener("input", renderTable);
+    $("btnFilterClear").onclick = () => {
+      $("filterResults").value = "";
+      $("filterResults").focus();
+      renderTable();
+    };
+
+    $("tbody").addEventListener("click", (e) => {
+      const tr = e.target.closest("tr[data-i]");
+      if (!tr) return;
+      const i = +tr.dataset.i;
+      if (e.target.classList.contains("chk")) {
+        studies[i].selected = e.target.checked;
+      } else {
+        studies[i].selected = !studies[i].selected;
+      }
+      renderTable();
+    });
+
+    document.querySelectorAll("input").forEach(inp => {
+      inp.addEventListener("keydown", (e) => {
+        // En el cuadro de filtro, Enter no vuelve a consultar el PACS.
+        if (e.key === "Enter" && e.target.id !== "filterResults") search();
+      });
+    });
+
+    (async () => {
+      setToday();
+      try {
+        const res = await fetch("/api/dicom/status");
+        const s = await res.json();
+        const nodes = s.nodes || s.Nodes || [];
+        pacsNodes = nodes.map(n => ({
+          name: n.name || n.Name || "",
+          host: n.host || n.Host || "",
+          port: n.port || n.Port || 0,
+          aeTitle: n.aeTitle || n.AeTitle || ""
+        }));
+        renderAeTitleList();
+        cupo = Number(s.maxSimultaneous ?? s.MaxSimultaneous ?? 3) || 3;
+        verificacionActiva = !!(s.verify ?? s.Verify ?? true);
+        reintentos = Number(s.maxRetries ?? s.MaxRetries ?? 2);
+        const avisosZip = [];
+        if (verificacionActiva) avisosZip.push("verifica y repite lo que falta");
+        const partes = Number(s.zipMaxStudiesPerPart ?? 0);
+        if (partes > 0) avisosZip.push(`ZIP en partes de ${partes} estudios`);
+        $("statusBadge").textContent =
+          `${pacsNodes.length} nodo(s) PACS · ${s.retrieveMode || s.RetrieveMode || "C-GET"} · ${cupo} a la vez`;
+        log("API lista. " + (s.outputDirectory || s.OutputDirectory || ""), "ok");
+        if (avisosZip.length) log("Descargas: " + avisosZip.join(" · ") + ".", "info");
+        pintarCupo();
+      } catch {
+        $("statusBadge").textContent = "Sin conexión a la API";
+        log("No se pudo contactar /api/dicom/status. ¿Está corriendo el servicio?", "err");
+      }
+      // Cualquier descarga que ya estuviera corriendo (aquí o en otra ventana) vuelve a su pantalla.
+      await retomarDescargas();
+    })();
+  </script>
+<script src="/js/ubicacion.js"></script>
+</body>
+</html>

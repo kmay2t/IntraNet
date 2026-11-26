@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <script src="/js/theme.js?v=20261119e"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- La hoja del quemador se unió a la bitácora de accesos. Esta dirección vieja se conserva
+       solo para que los marcadores y los enlaces escritos antes sigan funcionando: aterrizan en
+       la Bitácora con el filtro "del programa del quemador" ya puesto. -->
+  <meta http-equiv="refresh" content="0; url=/admin/bitacora/index.html?fuente=quemador" />
+  <title>Bitácora del Quemador — movida a la Bitácora</title>
+  <link rel="stylesheet" href="/css/panel.css?v=20261123a" />
+  <style>
+    .aviso-movida { max-width: 640px; margin: 0 auto; text-align: center; }
+    .aviso-movida p { font-size: .92rem; color: var(--muted); line-height: 1.55; }
+    .aviso-movida .btn-primary { display: inline-flex; align-items: center; gap: 8px; margin-top: 6px; }
+  </style>
+  <link rel="stylesheet" href="/css/theme.css?v=20261120f" />
+</head>
+<body class="theme-panel">
+  <header>
+    <h1>Bitácora del Quemador</h1>
+    <div class="logo-centro">Meditechnosys<span>Medical Technology Solutions</span></div>
+    <div class="botones-nav">
+      <button class="boton-nav" onclick="window.location.href='/'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Home
+      </button>
+    </div>
+  </header>
+  <div class="fondo-logo" aria-hidden="true"></div>
+
+  <main>
+    <section class="card aviso-movida">
+      <h2>Esta hoja ya vive dentro de la Bitácora</h2>
+      <p>
+        Desde ahora los movimientos del programa de grabación DICOM y los accesos a la intranet se ven
+        juntos, por persona: la Bitácora abre con la lista de usuarios y al hacer clic en uno se abre su
+        ventana con todo lo que hizo —fecha, hora, actividad, IP, ubicación geográfica y qué fue lo que
+        hizo—, con su filtro «del programa del quemador» ya puesto. Te llevamos ahí; si el navegador no
+        te mueve solo, usa el botón.
+      </p>
+      <p>
+        <a class="btn-primary" id="enlace" href="/admin/bitacora/index.html?fuente=quemador">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          Ir a la Bitácora (solo el quemador)
+        </a>
+      </p>
+      <p><a id="verTodas" href="/admin/bitacora/index.html" style="font-size:.84rem">o entrar a la Bitácora sin filtro y elegir tú al usuario</a></p>
+    </section>
+  </main>
+
+  <script>
+  (function () {
+    'use strict';
+    // Conserva lo que el enlace antiguo trajera puesto, para no perder la búsqueda de un paciente
+    // concreto al mudar de pantalla.
+    var q = new URLSearchParams(window.location.search);
+    var destino = new URLSearchParams();
+    destino.set('fuente', 'quemador');
+    ['usuario', 'dia', 'lote', 'texto'].forEach(function (k) {
+      if (q.get(k)) destino.set(k, q.get(k));
+    });
+    var url = '/admin/bitacora/index.html?' + destino.toString();
+    var enlace = document.getElementById('enlace');
+    if (enlace) enlace.href = url;
+    window.location.replace(url);
+  })();
+  </script>
+</body>
+</html>

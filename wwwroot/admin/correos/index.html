@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <script src="/js/theme.js?v=20261119e"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bandeja de soporte — Intranet meditechnosys</title>
+  <link rel="stylesheet" href="/css/panel.css?v=20261123a" />
+  <style>
+    .cabecera-card { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+    .cabecera-card h2 { margin: 0; }
+    .botonera { display: flex; gap: 8px; flex-wrap: wrap; }
+    .buzon { font-family: Consolas, monospace; font-size: .85rem; color: var(--muted); }
+
+    /* Pestañas de carpetas: Recibidos · Enviados · Borradores */
+    .pestanas { display: flex; gap: 4px; border-bottom: 1px solid var(--linea, #e2e8f0); margin: 0 0 14px; flex-wrap: wrap; }
+    .pestana { border: 1px solid transparent; border-bottom: 0; background: transparent; cursor: pointer;
+      font: inherit; font-weight: 600; font-size: .9rem; color: var(--muted); padding: 8px 16px;
+      border-radius: 10px 10px 0 0; margin-bottom: -1px; }
+    .pestana:hover { color: var(--texto, #0f172a); background: var(--panel-2, rgba(148,163,184,.1)); }
+    .pestana.activa { color: var(--texto, #0f172a); background: var(--panel, #fff); border-color: var(--linea, #e2e8f0); }
+    .pestana .cuenta { display: inline-block; min-width: 20px; text-align: center; font-size: .72rem; font-weight: 700;
+      background: rgba(59,130,246,.16); color: #1e40af; border-radius: 999px; padding: 1px 7px; margin-left: 6px; }
+
+    /* Cuentas de la bandeja: soporte + el segundo correo enlazado (esta solo aparece si existe).
+       Se elige con una, y la otra sigue intacta: cada cuenta lee y envia desde su propio buzon. */
+    .cuentas { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+    .chip { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+      border: 1px solid var(--linea, #e2e8f0); border-radius: 12px; background: var(--panel-2, rgba(148,163,184,.08));
+      color: var(--texto, #0f172a); font: inherit; padding: 8px 14px; cursor: pointer; min-width: 190px; }
+    .chip:hover { border-color: rgba(59,130,246,.45); }
+    .chip .chip-cabeza { display: flex; align-items: center; gap: 7px; font-size: .7rem; font-weight: 700;
+      letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+    .chip .chip-correo { font-family: Consolas, monospace; font-size: .88rem; font-weight: 700; word-break: break-all; }
+    .chip.activa { background: var(--panel, #fff); border-color: rgba(59,130,246,.55); box-shadow: inset 0 0 0 1px rgba(59,130,246,.25); }
+    .chip.activa .chip-cabeza { color: #1e40af; }
+    .chip.pendiente { border-style: dashed; color: var(--muted); }
+    .chip .chip-estado { font-size: .72rem; color: #92400e; }
+
+    td.fecha { white-space: nowrap; font-family: Consolas, monospace; font-size: .82rem; color: var(--muted); }
+    td.remitente { font-weight: 600; }
+    td.clip { text-align: center; width: 34px; }
+    tr.fila-correo { cursor: pointer; }
+    tr.fila-correo:hover td { background: var(--panel-2); }
+    .aviso { border: 1px solid var(--warn); background: rgba(245,158,11,.12); color: #7c2d12; border-radius: 10px; padding: 12px 14px; margin: 0 0 14px; font-size: .9rem; }
+    .aviso strong { display: block; margin-bottom: 4px; }
+    .aviso.ok { border-color: var(--ok); background: rgba(34,197,94,.12); color: #052e16; }
+    .aviso code { font-family: Consolas, monospace; background: rgba(0,0,0,.06); padding: 1px 6px; border-radius: 6px; }
+    .cargando { color: var(--muted); font-size: .9rem; padding: 8px 0; }
+    .meta { display: grid; grid-template-columns: 70px 1fr; gap: 2px 10px; font-size: .88rem; margin: 0 0 12px; }
+    .meta dt { color: var(--muted); }
+    .meta dd { margin: 0; }
+    .cuerpo-correo { border: 1px solid var(--linea, #e2e8f0); border-radius: 10px; background: #fff; min-height: 120px; }
+    .cuerpo-correo iframe { width: 100%; min-height: 340px; border: 0; border-radius: 10px; display: block; }
+    .cuerpo-correo pre { margin: 0; padding: 14px; white-space: pre-wrap; word-break: break-word; font-family: Consolas, monospace; font-size: .85rem; color: #111; }
+    .adjuntos { margin: 12px 0 0; font-size: .88rem; }
+    .adjuntos a { display: inline-block; margin: 0 10px 6px 0; }
+
+    /* ---- editor de correo ---- */
+    /* Las cajas del formulario usan display:flex, que gana al atributo hidden del navegador:
+       sin esta regla, CC/CCO y «adjuntar el original» se mostraban siempre. */
+    [hidden] { display: none !important; }
+    .modal { border: 1px solid var(--linea, #e2e8f0); border-radius: 14px; padding: 0; width: min(880px, 96vw);
+      background: var(--panel, #fff); color: var(--texto, #0f172a); box-shadow: 0 24px 60px rgba(2,6,23,.35); }
+    .modal::backdrop { background: rgba(2,6,23,.6); backdrop-filter: blur(2px); }
+    /* panel.css limita los dialog.modal a 460px; aqui se amplian con mas especificidad.
+       La ventana de redaccion/responder es la mas grande: es donde se escribe el correo. */
+    #dlgRedactar.modal { width: min(1180px, 97vw); max-width: 97vw; }
+    .modal-cuerpo { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 10px; max-height: 92vh; overflow: auto; }
+    .modal-cuerpo h3 { margin: 0; font-size: 1.05rem; }
+    .campo { display: flex; flex-direction: column; gap: 4px; }
+    .campo > span { font-size: .72rem; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+    .campo input, .campo select { font: inherit; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--linea, #cbd5e1);
+      background: var(--fondo, #fff); color: var(--texto, #0f172a); width: 100%; box-sizing: border-box; }
+    .pills { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; border: 1px solid var(--linea, #cbd5e1);
+      border-radius: 9px; padding: 6px; background: var(--fondo, #fff); }
+    .pill { display: inline-flex; align-items: center; gap: 6px; background: rgba(59,130,246,.14); border: 1px solid rgba(59,130,246,.35);
+      color: #1e40af; border-radius: 999px; padding: 2px 4px 2px 10px; font-size: .8rem; font-family: Consolas, monospace; }
+    .pill button { border: 0; background: transparent; color: inherit; cursor: pointer; font-size: .95rem; line-height: 1; padding: 0 4px; }
+    .pills input { flex: 1 1 180px; border: 0 !important; background: transparent !important; outline: none; min-width: 160px; }
+    .palanca { display: flex; align-items: center; gap: 8px; font-size: .85rem; }
+    .palanca input { width: auto; }
+
+    .barra { display: flex; flex-wrap: wrap; gap: 4px; border: 1px solid var(--linea, #cbd5e1); border-bottom: 0;
+      border-radius: 10px 10px 0 0; padding: 6px; background: var(--panel-2, rgba(148,163,184,.1)); }
+    .barra button { min-width: 32px; height: 30px; border: 1px solid transparent; border-radius: 7px; background: transparent;
+      cursor: pointer; font: inherit; font-size: .85rem; color: var(--texto, #0f172a); padding: 0 7px; }
+    .barra button:hover { background: rgba(59,130,246,.14); border-color: rgba(59,130,246,.3); }
+    .barra .sep { width: 1px; background: var(--linea, #cbd5e1); margin: 2px 4px; }
+    .editor { border: 1px solid var(--linea, #cbd5e1); border-radius: 0 0 10px 10px; min-height: 340px; max-height: 54vh;
+      overflow: auto; padding: 14px 16px; background: #fff; color: #0f172a; font-size: .95rem; line-height: 1.6; }
+    .editor:empty:before { content: attr(data-pista); color: #94a3b8; }
+    .editor img { max-width: 100%; height: auto; cursor: pointer; }
+    .editor img.sel { outline: 2px solid #2563eb; outline-offset: 1px; }
+    /* Barra de la imagen elegida: va pegada arriba del cuerpo, con la misma familia visual que .barra */
+    .barra-imagen { display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
+      border: 1px solid var(--linea, #cbd5e1); border-bottom: 0;
+      padding: 5px 8px; background: rgba(59,130,246,.10); font-size: .8rem; }
+    .barra-imagen .bi-titulo { font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+      font-size: .7rem; color: #1e40af; }
+    .barra-imagen .bi-nombre { font-family: Consolas, monospace; max-width: 260px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap; }
+    .barra-imagen .bi-medida { font-family: Consolas, monospace; color: #475569; margin-left: 4px; }
+    .barra-imagen .sep { width: 1px; align-self: stretch; background: var(--linea, #cbd5e1); margin: 2px 4px; }
+    .barra-imagen button { min-width: 30px; height: 26px; border: 1px solid transparent; border-radius: 6px;
+      background: transparent; cursor: pointer; font: inherit; font-size: .78rem; color: var(--texto, #0f172a); padding: 0 6px; }
+    .barra-imagen button:hover { background: rgba(59,130,246,.16); border-color: rgba(59,130,246,.35); }
+    .barra-imagen button.activa { background: #fff; border-color: #2563eb; color: #1e40af; font-weight: 700; }
+    .barra-imagen .bi-quitar { color: #b91c1c; }
+    .barra-imagen .bi-quitar:hover { background: rgba(185,28,28,.12); border-color: rgba(185,28,28,.35); }
+    /* Cuadro de agarre: se ancla a la esquina inferior derecha de la imagen seleccionada */
+    .asa-imagen { position: fixed; width: 14px; height: 14px; border: 2px solid #2563eb; background: #fff;
+      border-radius: 3px; cursor: nwse-resize; z-index: 10; touch-action: none; }
+    .asa-imagen:hover { background: #dbeafe; }
+    .editor blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid #cbd5e1; color: #475569; }
+    .lista-archivos { display: flex; flex-direction: column; gap: 5px; font-size: .84rem; }
+    .archivo { display: flex; align-items: center; gap: 8px; border: 1px solid var(--linea, #cbd5e1); border-radius: 8px; padding: 4px 8px; }
+    .archivo .nombre { font-family: Consolas, monospace; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .archivo .peso { color: var(--muted); font-size: .78rem; }
+    .archivo button { border: 0; background: transparent; cursor: pointer; color: #b91c1c; font-size: .95rem; }
+    .nota { font-size: .78rem; color: var(--muted); margin: 0; }
+    .modal-acciones { display: flex; align-items: center; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+    .modal-acciones .estado { margin-right: auto; font-size: .85rem; color: var(--muted); }
+    .error-inline { color: #b91c1c; font-size: .85rem; margin: 0; }
+  </style>
+  <link rel="stylesheet" href="/css/theme.css?v=20261120f" />
+</head>
+<body class="theme-panel">
+  <header>
+    <h1>Bandeja de soporte</h1>
+    <div class="logo-centro">Meditechnosys<span>Medical Technology Solutions</span></div>
+    <span class="badge" id="badgeUsuario">…</span>
+    <div class="botones-nav">
+      <button class="boton-nav" onclick="window.location.href='/'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Regresar
+      </button>
+      <button class="boton-nav" onclick="window.location.href='/'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Home
+      </button>
+    </div>
+  </header>
+  <div class="fondo-logo" aria-hidden="true"></div>
+
+  <main class="page-wide">
+    <section class="card" id="seccionLista">
+      <div class="cuentas" id="cajaCuentas" role="group" aria-label="Cuentas de correo"></div>
+
+      <div class="pestanas" role="tablist">
+        <button class="pestana activa" role="tab" data-carpeta="recibidos">Recibidos</button>
+        <button class="pestana" role="tab" data-carpeta="enviados">Enviados</button>
+        <button class="pestana" role="tab" data-carpeta="borradores">Borradores</button>
+      </div>
+
+      <div class="cabecera-card">
+        <h2 id="tituloLista">Correos recibidos</h2>
+        <div class="botonera">
+          <button class="btn-primary" id="btnRedactar">Redactar</button>
+          <button class="btn-secondary" id="btnActualizar">Actualizar</button>
+        </div>
+      </div>
+      <p class="hint" style="margin:0 0 12px" id="ayudaLista">
+        Haz clic en un correo para abrirlo. Desde ahí puedes responder, responder a todos,
+        reenviar, insertar imágenes y poner copias visibles (CC) u ocultas (CCO).
+      </p>
+
+      <div id="avisoLista" class="aviso" hidden></div>
+      <p class="cargando" id="cargandoLista">Leyendo la bandeja…</p>
+
+      <div class="table-wrap" id="tablaWrap" hidden>
+        <table>
+          <thead><tr><th>Fecha</th><th id="colRemitente">Remitente</th><th>Asunto</th><th></th></tr></thead>
+          <tbody id="cuerpoTabla"></tbody>
+        </table>
+      </div>
+      <p class="empty" id="vacioLista" hidden>No hay correos en la bandeja de entrada.</p>
+    </section>
+
+    <section class="card" id="seccionDetalle" hidden>
+      <div class="cabecera-card">
+        <h2 id="detalleAsunto">Mensaje</h2>
+        <div class="botonera">
+          <button class="btn-primary" id="btnResponder" hidden>Responder</button>
+          <button class="btn-secondary" id="btnResponderTodos" hidden>Responder a todos</button>
+          <button class="btn-secondary" id="btnReenviar" hidden>Reenviar</button>
+          <button class="btn-primary" id="btnEditarBorrador" hidden>Editar borrador</button>
+          <button class="btn-secondary" id="btnEliminarBorrador" hidden>Eliminar</button>
+          <button class="btn-secondary" id="btnCerrarDetalle">Cerrar</button>
+        </div>
+      </div>
+      <div id="avisoDetalle" class="aviso" hidden></div>
+      <p class="cargando" id="cargandoDetalle" hidden>Abriendo el mensaje…</p>
+
+      <dl class="meta" id="detalleMeta" hidden></dl>
+      <div class="cuerpo-correo" id="detalleCuerpo" hidden></div>
+      <div class="adjuntos" id="detalleAdjuntos" hidden></div>
+    </section>
+  </main>
+
+  <!-- ==================== EDITOR DE CORREO ==================== -->
+  <dialog class="modal" id="dlgRedactar" aria-labelledby="titRedactar">
+    <div class="modal-cuerpo">
+      <h3 id="titRedactar">Redactar correo</h3>
+
+      <div class="campo">
+        <span>Enviar con</span>
+        <select id="selCuenta" aria-label="Cuenta con la que se envía el correo"></select>
+        <p class="nota" id="notaCuenta">Salida con la cuenta de soporte; cámbiala si quieres que el correo salga con tu segundo correo.</p>
+      </div>
+
+      <div class="campo">
+        <span>Para</span>
+        <div class="pills" id="pillsPara"><input id="inpPara" placeholder="escribe un correo y pulsa Enter" autocomplete="off"></div>
+      </div>
+      <div class="campo" id="cajaCc" hidden>
+        <span>CC (copia visible)</span>
+        <div class="pills" id="pillsCc"><input id="inpCc" placeholder="correos que verán todos" autocomplete="off"></div>
+      </div>
+      <div class="campo" id="cajaCco" hidden>
+        <span>CCO (copia oculta)</span>
+        <div class="pills" id="pillsCco"><input id="inpCco" placeholder="nadie verá que recibió este correo" autocomplete="off"></div>
+      </div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap">
+        <label class="palanca"><input type="checkbox" id="chkCc"> Añadir CC</label>
+        <label class="palanca"><input type="checkbox" id="chkCco"> Añadir CCO (oculta)</label>
+      </div>
+
+      <div class="campo">
+        <span>Asunto</span>
+        <input id="inpAsunto" maxlength="300" placeholder="Asunto del correo">
+      </div>
+
+      <div class="campo">
+        <span>Mensaje</span>
+        <div class="barra" role="toolbar" aria-label="Formato del mensaje">
+          <button type="button" data-comando="bold" title="Negrita"><b>N</b></button>
+          <button type="button" data-comando="italic" title="Cursiva"><i>C</i></button>
+          <button type="button" data-comando="underline" title="Subrayado"><u>S</u></button>
+          <button type="button" data-comando="strikeThrough" title="Tachado"><s>T</s></button>
+          <span class="sep"></span>
+          <button type="button" data-comando="insertUnorderedList" title="Lista con viñetas">• Lista</button>
+          <button type="button" data-comando="insertOrderedList" title="Lista numerada">1. Lista</button>
+          <button type="button" data-comando="formatBlock" data-valor="blockquote" title="Cita">&ldquo; Cita</button>
+          <span class="sep"></span>
+          <button type="button" id="btnEnlace" title="Insertar enlace">Enlace</button>
+          <button type="button" id="btnImagen" title="Insertar imagen desde un archivo">Imagen</button>
+          <button type="button" id="btnAdjunto" title="Adjuntar cualquier archivo">Adjuntar</button>
+          <span class="sep"></span>
+          <button type="button" data-comando="removeFormat" title="Quitar formato">Limpiar</button>
+          <button type="button" data-comando="undo" title="Deshacer">↶</button>
+          <button type="button" data-comando="redo" title="Rehacer">↷</button>
+        </div>
+        <!-- Barra de la imagen elegida: solo aparece al hacer clic en una imagen del cuerpo.
+             Ajusta el tamaño sin tocar el archivo: lo que se manda es la imagen original. -->
+        <div class="barra-imagen" id="barraImagen" hidden>
+          <span class="bi-titulo">Imagen</span>
+          <span class="bi-nombre" id="biNombre">—</span>
+          <span class="bi-medida" id="biMedida">—</span>
+          <span class="sep"></span>
+          <button type="button" data-ancho="original" title="Su tamaño real">Original</button>
+          <button type="button" data-ancho="75">75%</button>
+          <button type="button" data-ancho="50">50%</button>
+          <button type="button" data-ancho="25">25%</button>
+          <button type="button" data-ancho="ancho" title="Todo el ancho del mensaje">Ancho</button>
+          <span class="sep"></span>
+          <button type="button" class="bi-quitar" id="biQuitar" title="Quitar la imagen del cuerpo">Quitar imagen</button>
+        </div>
+        <div class="editor" id="editor" contenteditable="true" data-pista="Escribe aquí tu respuesta… Puedes pegar una captura con Ctrl+V."
+             aria-label="Cuerpo del mensaje"></div>
+        <p class="nota">Puedes pegar una captura de pantalla (Ctrl+V) o arrastrarla aquí: se inserta como imagen dentro del correo. Haz clic en la imagen para verla grande y ajustar su tamaño con la barra o con el cuadro azul.</p>
+      </div>
+
+      <div class="campo" id="cajaArchivos" hidden>
+        <span>Archivos del correo</span>
+        <div class="lista-archivos" id="listaArchivos"></div>
+      </div>
+
+      <label class="palanca" id="cajaOriginal" hidden>
+        <input type="checkbox" id="chkOriginal" checked> Adjuntar el mensaje original (se ve como correo reenviado)
+      </label>
+
+      <p class="error-inline" id="errRedactar" role="alert" hidden></p>
+      <div class="modal-acciones">
+        <span class="estado" id="estadoRedactar"></span>
+        <button type="button" class="btn-secondary" id="btnCancelarRedactar">Descartar</button>
+        <button type="button" class="btn-secondary" id="btnGuardarBorrador">Guardar borrador</button>
+        <button type="button" class="btn-primary" id="btnEnviar">Enviar</button>
+      </div>
+      <input type="file" id="fileImagen" accept="image/*" multiple hidden>
+      <input type="file" id="fileAdjunto" multiple hidden>
+      <!-- Cuadro de agarre de la imagen elegida. Vive dentro de la ventana para que el navegador
+           no lo deje fuera del modal (los clics de fuera de un diálogo modal no llegan). -->
+      <div class="asa-imagen" id="asaImagen" title="Arrastra para cambiar el tamaño" style="display:none"></div>
+    </div>
+  </dialog>
+
+  <script>
+  (function () {
+    'use strict';
+
+    var puedeResponder = false;
+    var uidAbierto = null;
+    var detalleAbierto = null;
+    var predeterminado = 'soporte@meditechnosys.mx';
+    var carpeta = 'recibidos';  // recibidos | enviados | borradores
+
+    // Las dos cuentas de la bandeja: `soporte` (appsettings, la de siempre) y `propio` (el segundo
+    // correo que el administrador enlaza en Usuarios). `cuenta` es la que se esta viendo y la que
+    // propone el editor al redactar; al abrir la pantalla siempre arranca en soporte.
+    var CUENTAS = { SOPORTE: 'soporte', PROPIO: 'propio' };
+    var KEY_CUENTA = 'bandeja.cuenta';
+    var cuentas = [];           // [{ id, correo, nombre, esSoporte, disponible, aviso }]
+    var cuenta = CUENTAS.SOPORTE;
+
+    // ---- estado del editor ----
+    var archivos = [];          // { nombre, contentType, base64, cid, peso, tipo }
+    var seqCid = 0;
+    var modo = 'nuevo';         // nuevo | responder | todos | reenviar
+    var enRespuestaA = null;
+
+    function api(url, opts) {
+      return fetch(url, Object.assign({ headers: { Accept: 'application/json' }, credentials: 'same-origin' }, opts || {}))
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (data) {
+            if (!r.ok) throw new Error(data.error || data.title || ('Error ' + r.status));
+            return data;
+          });
+        });
+    }
+    function post(url, cuerpo) {
+      return api(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(cuerpo) });
+    }
+    function del(url) { return api(url, { method: 'DELETE' }); }
+
+    // Query de las lecturas: los uid son propios de cada carpeta Y de cada cuenta, asi que
+    // detalle/adjuntos/inline/borrado tienen que decir ambos.
+    function qsCarpeta() {
+      return '?carpeta=' + encodeURIComponent(carpeta) + '&cuenta=' + encodeURIComponent(cuenta);
+    }
+
+    function nombreRol(rol) {
+      if (!rol) return '(sin rol)';
+      if (String(rol).toLowerCase() === 'admin') return 'Administrador';
+      if (String(rol).toLowerCase() === 'ingeniero') return 'Ingeniero';
+      return rol;
+    }
+    api('/api/patologia/me').then(function (me) {
+      document.getElementById('badgeUsuario').textContent = me.usuario + ' · ' + nombreRol(me.rol);
+    }).catch(function () { });
+    api('/api/permisos/mios').then(function (p) {
+      puedeResponder = (p.permisos || []).indexOf('correo.responder') >= 0;
+      ['btnResponder', 'btnResponderTodos', 'btnReenviar', 'btnRedactar'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.hidden = !puedeResponder;
+      });
+    }).catch(function () { });
+
+    function fechaLarga(iso) {
+      if (!iso) return '';
+      var d = new Date(iso);
+      if (isNaN(d)) return '';
+      var p = function (n) { return (n < 10 ? '0' : '') + n; };
+      return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() +
+        ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
+    function peso(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+      return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    }
+    function aviso(el, titulo, html, ok) {
+      el.innerHTML = '<strong></strong><span></span>';
+      el.children[0].textContent = titulo;
+      el.children[1].innerHTML = html;
+      el.className = 'aviso' + (ok ? ' ok' : '');
+      el.hidden = false;
+    }
+    function ocultar(el) { el.hidden = true; }
+    function errorRedactar(m) { var e = document.getElementById('errRedactar'); e.textContent = m; e.hidden = !m; }
+
+    // ================= LAS DOS CUENTAS =================
+    // El de soporte siempre esta; el segundo correo solo aparece y se puede usar cuando el
+    // administrador lo enlazo en Usuarios.
+    // La bandeja no enlaza ni cambia nada: ensena las que haya, deja elegir cual se ve y con cual se envia.
+    function busCuenta(id) {
+      for (var i = 0; i < cuentas.length; i++) if (cuentas[i].id === id) return cuentas[i];
+      return null;
+    }
+    function correoDe(id) {
+      var c = busCuenta(id);
+      if (c && c.correo) return c.correo;
+      return id === CUENTAS.PROPIO ? '' : predeterminado;
+    }
+    function disponibles() {
+      return cuentas.filter(function (c) { return c.disponible; });
+    }
+
+    // La pestaña del segundo correo **solo aparece si ya está enlazada**: sin cuenta conectada la bandeja
+    // muestra una sola pestaña (antes salía punteada con el motivo «Sin enlazar · lo conecta el
+    // administrador»). El buzón de soporte sí se pinta siempre, incluso sin configurar, para que la
+    // pantalla nunca quede sin ninguna pestaña ni con un botón muerto. Si el enlace existe pero no
+    // funciona, la pestaña sí sale (punteada) porque ahí el aviso es útil: algo hay que arreglar.
+    function pintarCuentas() {
+      var caja = document.getElementById('cajaCuentas');
+      caja.innerHTML = '';
+      cuentas.forEach(function (c) {
+        if (!c.esSoporte && c.enlazado === false) return;
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip' + (c.id === cuenta ? ' activa' : '') + (c.disponible ? '' : ' pendiente');
+        var cab = document.createElement('span');
+        cab.className = 'chip-cabeza';
+        cab.textContent = c.esSoporte ? 'Buzón de soporte' : 'Segundo correo';
+        var dir = document.createElement('span');
+        dir.className = 'chip-correo';
+        dir.textContent = c.correo || (c.esSoporte ? predeterminado : 'Enlace incompleto');
+        b.appendChild(cab); b.appendChild(dir);
+        if (!c.disponible) {
+          var e = document.createElement('span');
+          e.className = 'chip-estado';
+          e.textContent = c.esSoporte ? 'Sin configurar' : 'Enlazado pero no abre · lo arregla el administrador';
+          b.appendChild(e);
+        }
+        if (c.aviso) b.title = c.aviso;
+        b.addEventListener('click', function () { cambiarCuenta(c.id); });
+        caja.appendChild(b);
+      });
+    }
+
+    // Cuenta activa: devuelve true si cambio de verdad (el que llama recarga entonces la bandeja).
+    function activarCuenta(id) {
+      var nuevo = busCuenta(id) ? id : CUENTAS.SOPORTE;
+      if (nuevo === cuenta) return false;
+      cuenta = nuevo;
+      guardarRecuerdo();
+      cerrarDetalle();
+      pintarCuentas();
+      return true;
+    }
+    function cambiarCuenta(id) { if (activarCuenta(id)) cargarLista(); }
+
+    // La eleccion dura lo que dura la pestana: al entrar de nuevo a la bandeja se vuelve a soporte.
+    function guardarRecuerdo() {
+      try { window.sessionStorage.setItem(KEY_CUENTA, cuenta); } catch (e) { }
+    }
+    function leerRecuerdo() {
+      try { return window.sessionStorage.getItem(KEY_CUENTA); } catch (e) { return null; }
+    }
+
+    function cargarBuzon() {
+      function normaliza(d) {
+        var lista = (d && d.cuentas) || [];
+        if (!lista.length) {
+          lista = [{
+            id: CUENTAS.SOPORTE,
+            correo: (d && d.correo) || predeterminado,
+            esSoporte: true, disponible: true, aviso: null
+          }];
+        }
+        return lista;
+      }
+      function fijar(lista) {
+        cuentas = lista;
+        cuenta = CUENTAS.SOPORTE;
+        var r = leerRecuerdo();
+        if (r && r !== CUENTAS.SOPORTE) {
+          var c = busCuenta(r);
+          if (c && c.disponible) cuenta = r;
+        }
+        if (!busCuenta(cuenta)) cuenta = CUENTAS.SOPORTE;
+        pintarCuentas();
+      }
+      return api('/api/correos/mio').then(function (d) { fijar(normaliza(d)); },
+        function () { fijar(normaliza(null)); });
+    }
+
+    // «Enviar con» del editor: solo las cuentas que si se pueden abrir. `preferida` es la bandeja
+    // que se esta leyendo, que por defecto es soporte.
+    function llenarCuentasEditor(preferida) {
+      var d = document.getElementById('selCuenta');
+      var ops = disponibles();
+      d.innerHTML = '';
+      ops.forEach(function (c) {
+        var o = document.createElement('option');
+        o.value = c.id;
+        o.textContent = (c.esSoporte ? 'Soporte · ' : 'Segundo correo · ') + (c.correo || predeterminado);
+        d.appendChild(o);
+      });
+      d.disabled = ops.length === 0;
+      var querer = preferida;
+      if (!ops.some(function (c) { return c.id === querer; })) querer = ops.length ? ops[0].id : CUENTAS.SOPORTE;
+      d.value = querer;
+      document.getElementById('notaCuenta').textContent = d.disabled
+        ? 'Ninguna cuenta se puede usar todavía: el administrador enlaza el segundo correo en Usuarios.'
+        : 'El correo sale con la cuenta que elijas aquí; por defecto es la de soporte.';
+    }
+
+    // ================= LISTA =================
+    function pintarLista(res) {
+      var tb = document.getElementById('cuerpoTabla');
+      var wrap = document.getElementById('tablaWrap');
+      var vacio = document.getElementById('vacioLista');
+      var avisoL = document.getElementById('avisoLista');
+      tb.innerHTML = '';
+      ocultar(avisoL);
+
+      if (!res.configurado) {
+        wrap.hidden = true; vacio.hidden = true;
+        var esPropio = cuenta === CUENTAS.PROPIO;
+        var link = '<a href="/admin/usuarios/index.html" style="color:var(--azul);font-weight:600">Usuarios</a>';
+        aviso(avisoL, esPropio ? 'El segundo correo no se puede abrir' : 'El buzón de soporte no está configurado',
+          (res.error ? String(res.error) + ' ' : 'Esta cuenta no tiene buzón abierto todavía. ') +
+          (esPropio
+            ? 'El administrador lo conecta en ' + link + ', en el bloque «Buzón de correo», al dar de alta o editar la cuenta.'
+            : 'Hace falta escribir su contraseña en <code>appsettings.json</code> (sección <code>Correo:Imap</code>).'));
+        return;
+      }
+      if (res.error) {
+        wrap.hidden = true; vacio.hidden = true;
+        aviso(avisoL, 'No se pudo leer la bandeja', String(res.error));
+        return;
+      }
+
+      var mensajes = res.mensajes || [];
+      var vacioTxt = { recibidos: 'No hay correos en la bandeja de entrada.',
+        enviados: 'Aún no has enviado correos desde esta bandeja.',
+        borradores: 'No tienes borradores guardados.' };
+      vacio.textContent = vacioTxt[carpeta] || 'No hay correos.';
+      vacio.hidden = mensajes.length > 0;
+      wrap.hidden = mensajes.length === 0;
+      mensajes.forEach(function (m) {
+        var tr = document.createElement('tr');
+        tr.className = 'fila-correo';
+        tr.innerHTML = '<td class="fecha"></td><td class="remitente"></td><td class="asunto"></td><td class="clip"></td>';
+        tr.children[0].textContent = fechaLarga(m.fecha);
+        tr.children[1].textContent = m.remitente;
+        tr.children[2].textContent = m.asunto;
+        tr.children[3].textContent = m.conAdjuntos ? '📎' : '';
+        tr.addEventListener('click', function () { abrir(m.uid); });        tb.appendChild(tr);
+      });
+    }
+
+    function cargarLista() {
+      var cargando = document.getElementById('cargandoLista');
+      var btn = document.getElementById('btnActualizar');
+      cargando.hidden = false; btn.disabled = true;
+      ocultar(document.getElementById('avisoLista'));
+      api('/api/correos' + qsCarpeta()).then(pintarLista)
+        .catch(function (e) { aviso(document.getElementById('avisoLista'), 'No se pudo leer la bandeja', String(e.message || e)); })
+        .then(function () { cargando.hidden = true; btn.disabled = false; });
+    }
+
+    // Rótulos segun la carpeta activa: titulo, columna y ayuda.
+    function pintarContexto() {
+      var titulos = { recibidos: 'Correos recibidos', enviados: 'Correos enviados', borradores: 'Borradores' };
+      document.getElementById('tituloLista').textContent = titulos[carpeta] || 'Correos';
+      document.getElementById('colRemitente').textContent = carpeta === 'recibidos' ? 'Remitente' : 'Para';
+      var ayuda = {
+        recibidos: 'Haz clic en un correo para abrirlo. Desde ahí puedes responder, responder a todos, reenviar, insertar imágenes y poner copias visibles (CC) u ocultas (CCO).',
+        enviados: 'Aquí están los correos que enviaste desde esta bandeja. Haz clic en uno para volver a abrirlo.',
+        borradores: 'Aquí se guardan los correos que dejaste a medias. Ábrelos con «Editar borrador» para continuar y enviarlos.'
+      };
+      document.getElementById('ayudaLista').textContent = ayuda[carpeta] || '';
+      Array.prototype.forEach.call(document.querySelectorAll('.pestana'), function (t) {
+        t.classList.toggle('activa', t.dataset.carpeta === carpeta);
+      });
+    }
+
+    // ================= DETALLE =================
+    function abrir(uid) {
+      uidAbierto = uid;
+      var sec = document.getElementById('seccionDetalle');
+      sec.hidden = false;
+      ocultar(document.getElementById('avisoDetalle'));
+      document.getElementById('cargandoDetalle').hidden = false;
+      document.getElementById('detalleMeta').hidden = true;
+      document.getElementById('detalleCuerpo').hidden = true;
+      document.getElementById('detalleAdjuntos').hidden = true;
+      document.getElementById('detalleAsunto').textContent = 'Mensaje';
+
+      api('/api/correos/' + uid + qsCarpeta()).then(pintarDetalle)
+        .catch(function (e) {
+          document.getElementById('cargandoDetalle').hidden = true;
+          aviso(document.getElementById('avisoDetalle'), 'No se pudo abrir el mensaje', String(e.message || e));
+        })
+        .then(function () { sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+    }
+
+    // Las imagenes internas del mensaje (src="cid:...") se reescriben al endpoint que las sirve.
+    // El endpoint siempre recibe la carpeta activa: los uid son por carpeta, y un mensaje de
+    // Borradores no se puede leer con el uid de Recibidos.
+    function urlPieza(uid, tipo, indice) {
+      return '/api/correos/' + uid + '/' + tipo + '/' + indice + qsCarpeta();
+    }
+
+    function reescribirCid(html, inline) {
+      var porCid = {};
+      (inline || []).forEach(function (p) { if (p.cid) porCid[p.cid.replace(/^<|>$/g, '')] = p.indice; });
+      return String(html || '').replace(/src\s*=\s*(["'])cid:([^"']+)\1/gi, function (_todo, comilla, cid) {
+        var idx = porCid[cid.replace(/^<|>$/g, '')];
+        if (idx === undefined) return 'alt="imagen no disponible"';
+        return 'src=' + comilla + urlPieza(uidAbierto, 'inline', idx) + comilla;
+      });
+    }
+
+    function pintarDetalle(d) {
+      document.getElementById('cargandoDetalle').hidden = true;
+      detalleAbierto = d;
+      document.getElementById('detalleAsunto').textContent = d.asunto;
+
+      var meta = document.getElementById('detalleMeta');
+      meta.innerHTML = '';
+      var filas = [['De', d.remitente], ['Para', d.destinatarios || '—'],
+       ['CC', (d.copias || []).join(', ') || '—'], ['Fecha', fechaLarga(d.fecha)]];
+      // Las copias ocultas solo se ven en el propio buzón (el servidor las guarda en el borrador
+      // y en la copia de Enviados); en un correo recibido la cabecera no existe.
+      if ((d.copiasOcultas || []).length) filas.splice(3, 0, ['CCO', (d.copiasOcultas || []).join(', ')]);
+      filas
+        .forEach(function (par) {
+          var dt = document.createElement('dt'); dt.textContent = par[0];
+          var dd = document.createElement('dd'); dd.textContent = par[1];
+          meta.appendChild(dt); meta.appendChild(dd);
+        });
+      meta.hidden = false;
+
+      var cuerpo = document.getElementById('detalleCuerpo');
+      cuerpo.innerHTML = '';
+      if (d.html) {
+        var iframe = document.createElement('iframe');
+        // allow-same-origin + sandbox sin scripts: el correo se ve con formato y sus imágenes
+        // internas cargan desde la intranet, pero no puede ejecutar nada.
+        iframe.setAttribute('sandbox', 'allow-same-origin');
+        iframe.setAttribute('title', 'Contenido del correo');
+        iframe.srcdoc = reescribirCid(d.html, d.inline) +
+          '<style>body{font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#111;margin:12px}img{max-width:100%}</style>';
+        cuerpo.appendChild(iframe);
+      } else {
+        var pre = document.createElement('pre');
+        pre.textContent = d.texto || '(sin contenido)';
+        cuerpo.appendChild(pre);
+      }
+      cuerpo.hidden = false;
+
+      var adj = document.getElementById('detalleAdjuntos');
+      adj.innerHTML = '';
+      if (d.adjuntos && d.adjuntos.length) {
+        var t = document.createElement('strong'); t.textContent = 'Adjuntos: ';
+        adj.appendChild(t);
+        d.adjuntos.forEach(function (a) {
+          var link = document.createElement('a');
+          link.href = urlPieza(uidAbierto, 'adjuntos', a.indice);
+          link.setAttribute('download', a.nombre);
+          link.textContent = a.nombre;
+          adj.appendChild(link);
+        });
+        adj.hidden = false;
+      } else {
+        adj.hidden = true;
+      }
+
+      // Los botones cambian segun la carpeta: en Recibidos se responde; en Enviados solo se
+      // reenvia; en Borradores se continua editando o se elimina.
+      var puede = puedeResponder;
+      var acciones = {
+        btnResponder: puede && carpeta === 'recibidos',
+        btnResponderTodos: puede && carpeta === 'recibidos',
+        btnReenviar: puede && (carpeta === 'recibidos' || carpeta === 'enviados'),
+        btnEditarBorrador: puede && carpeta === 'borradores',
+        btnEliminarBorrador: puede && carpeta === 'borradores'
+      };
+      Object.keys(acciones).forEach(function (id) {
+        document.getElementById(id).hidden = !acciones[id];
+      });
+    }
+
+    function cerrarDetalle() {
+      document.getElementById('seccionDetalle').hidden = true;
+      uidAbierto = null;
+      detalleAbierto = null;
+    }
+
+    // ================= DESTINATARIOS (pills) =================
+    var direcciones = { para: [], cc: [], cco: [] };
+    function validaCorreo(t) { return /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(t); }
+
+    function pintarPills(key) {
+      var cont = document.getElementById('pills' + key.charAt(0).toUpperCase() + key.slice(1));
+      var inp = cont.querySelector('input');
+      Array.prototype.slice.call(cont.querySelectorAll('.pill')).forEach(function (p) { p.remove(); });
+      direcciones[key].forEach(function (d, i) {
+        var pill = document.createElement('span');
+        pill.className = 'pill';
+        pill.appendChild(document.createTextNode(d));
+        var x = document.createElement('button');
+        x.type = 'button'; x.textContent = '×'; x.title = 'Quitar';
+        x.addEventListener('click', function () { direcciones[key].splice(i, 1); pintarPills(key); });
+        pill.appendChild(x);
+        cont.insertBefore(pill, inp);
+      });
+    }
+
+    function agregar(key, texto) {
+      var nuevos = String(texto || '').split(/[,;\n]/).map(function (s) { return s.trim(); }).filter(Boolean);
+      var malos = [];
+      nuevos.forEach(function (d) {
+        if (validaCorreo(d)) {
+          if (direcciones[key].map(function (x) { return x.toLowerCase(); }).indexOf(d.toLowerCase()) < 0) direcciones[key].push(d);
+        } else malos.push(d);
+      });
+      pintarPills(key);
+      if (malos.length) errorRedactar('Revisa estos destinatarios: ' + malos.join(', '));
+      else errorRedactar('');
+    }
+
+    function enlazarInput(key) {
+      var cont = document.getElementById('pills' + key.charAt(0).toUpperCase() + key.slice(1));
+      var inp = cont.querySelector('input');
+      inp.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter' || ev.key === ',' || ev.key === ';') {
+          ev.preventDefault();
+          if (inp.value.trim()) { agregar(key, inp.value); inp.value = ''; }
+        } else if (ev.key === 'Backspace' && !inp.value && direcciones[key].length) {
+          direcciones[key].pop(); pintarPills(key);
+        }
+      });
+      inp.addEventListener('blur', function () { if (inp.value.trim()) { agregar(key, inp.value); inp.value = ''; } });
+      cont.addEventListener('click', function () { inp.focus(); });
+    }
+    enlazarInput('para'); enlazarInput('cc'); enlazarInput('cco');
+
+    // ================= ARCHIVOS / IMÁGENES =================
+    function leerArchivo(file) {
+      return new Promise(function (resolve, reject) {
+        if (file.size > 12 * 1024 * 1024) { reject(new Error(file.name + ' pesa más de 12 MB')); return; }
+        var fr = new FileReader();
+        fr.onerror = function () { reject(new Error('No se pudo leer ' + file.name)); };
+        fr.onload = function () {
+          var b64 = String(fr.result).split(',')[1] || '';
+          resolve({ nombre: file.name, contentType: file.type || 'application/octet-stream', base64: b64, peso: file.size });
+        };
+        fr.readAsDataURL(file);
+      });
+    }
+
+    // Dirección que el navegador SI puede pintar. El `cid:` es solo para el correo: el navegador no
+    // lo conoce y por eso antes salía el icono roto con el nombre del archivo. La vista usa el
+    // base64 que ya está en memoria; al enviar se vuelve a `cid:` (ver htmlParaEnviar).
+    function urlVista(a) { return 'data:' + (a.contentType || 'image/png') + ';base64,' + a.base64; }
+
+    // Inserta la imagen en el cursor y la registra con su cid para que viaje incrustada en el correo.
+    function insertarImagen(file) {
+      return leerArchivo(file).then(function (a) {
+        var cid = 'img' + (++seqCid) + '@meditechnosys';
+        a.cid = cid; a.tipo = 'imagen';
+        archivos.push(a);
+        var inp = document.getElementById('editor');
+        inp.focus();
+        var img = document.createElement('img');
+        img.src = urlVista(a);
+        img.alt = a.nombre;
+        img.dataset.cid = cid;
+        img.title = a.nombre + ' (' + peso(a.peso) + ') — clic para ajustar el tamaño';
+        var sel = window.getSelection();
+        if (sel && sel.rangeCount && inp.contains(sel.anchorNode)) {
+          var r = sel.getRangeAt(0);
+          r.deleteContents(); r.insertNode(img); r.setStartAfter(img); r.collapse(true);
+          sel.removeAllRanges(); sel.addRange(r);
+        } else inp.appendChild(img);
+        pintarArchivos();
+        // Se muestra seleccionada al insertarla: así se ve de una vez que ya está en el cuerpo y
+        // quedan a la mano los botones de tamaño.
+        esperarCuadro(img);
+      });
+    }
+
+    // Adjunto normal: se manda como archivo, no se pinta en el cuerpo.
+    function adjuntar(file) {
+      return leerArchivo(file).then(function (a) {
+        a.cid = null; a.tipo = 'adjunto';
+        archivos.push(a);
+        pintarArchivos();
+      });
+    }
+
+    function quitarArchivo(i) {
+      var a = archivos[i];
+      if (a && a.cid) {
+        var img = document.querySelector('#editor img[data-cid="' + a.cid + '"]');
+        if (img) { if (img === imgElegida) deseleccionarImagen(); img.remove(); }
+      }
+      archivos.splice(i, 1);
+      pintarArchivos();
+    }
+
+    function pintarArchivos() {
+      var caja = document.getElementById('cajaArchivos');
+      var lista = document.getElementById('listaArchivos');
+      lista.innerHTML = '';
+      if (!archivos.length) { caja.hidden = true; return; }
+      archivos.forEach(function (a, i) {
+        var div = document.createElement('div');
+        div.className = 'archivo';
+        var ic = document.createElement('span');
+        ic.textContent = a.tipo === 'imagen' ? '🖼' : '📎';
+        var n = document.createElement('span'); n.className = 'nombre'; n.textContent = a.nombre;
+        var p = document.createElement('span'); p.className = 'peso'; p.textContent = peso(a.peso) + (a.tipo === 'imagen' ? ' · incrustada' : ' · adjunto');
+        var x = document.createElement('button'); x.type = 'button'; x.textContent = '×'; x.title = 'Quitar';
+        x.addEventListener('click', function () { quitarArchivo(i); });
+        div.appendChild(ic); div.appendChild(n); div.appendChild(p); div.appendChild(x);
+        lista.appendChild(div);
+      });
+      caja.hidden = false;
+    }
+
+    // ================= EDITOR: barra, pegar y arrastrar =================
+    document.getElementById('editor').addEventListener('paste', function (ev) {
+      var items = (ev.clipboardData && ev.clipboardData.items) || [];
+      var imagenes = [];
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].kind === 'file' && items[i].type.indexOf('image/') === 0) {
+          var f = items[i].getAsFile();
+          if (f) imagenes.push(f);
+        }
+      }
+      if (imagenes.length) {
+        ev.preventDefault();
+        imagenes.forEach(function (f) { insertarImagen(f).catch(function (e) { errorRedactar(e.message); }); });
+        return;
+      }
+      // Texto plano: se pega limpio para no arrastrar formatos raros de otras ventanas.
+      var texto = ev.clipboardData ? ev.clipboardData.getData('text/plain') : null;
+      if (texto !== null && texto !== '') {
+        ev.preventDefault();
+        document.execCommand('insertText', false, texto);
+      }
+    });
+    document.getElementById('editor').addEventListener('drop', function (ev) {
+      var fs = (ev.dataTransfer && ev.dataTransfer.files) || [];
+      var hay = false;
+      Array.prototype.forEach.call(fs, function (f) {
+        hay = true;
+        if (f.type.indexOf('image/') === 0) insertarImagen(f).catch(function (e) { errorRedactar(e.message); });
+        else adjuntar(f).catch(function (e) { errorRedactar(e.message); });
+      });
+      if (hay) ev.preventDefault();
+    });
+    document.getElementById('editor').addEventListener('dragover', function (ev) { ev.preventDefault(); });
+
+    Array.prototype.forEach.call(document.querySelectorAll('.barra button[data-comando]'), function (b) {
+      b.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+      b.addEventListener('click', function () {
+        var comando = b.dataset.comando;
+        var valor = b.dataset.valor || null;
+        document.getElementById('editor').focus();
+        if (comando === 'formatBlock' && valor) document.execCommand('formatBlock', false, '<' + valor + '>');
+        else document.execCommand(comando, false, valor);
+      });
+    });
+
+    document.getElementById('btnEnlace').addEventListener('click', function () {
+      var url = window.prompt('Dirección del enlace (https://…):', 'https://');
+      if (!url) return;
+      document.getElementById('editor').focus();
+      document.execCommand('createLink', false, url);
+    });
+    document.getElementById('btnImagen').addEventListener('click', function () { document.getElementById('fileImagen').click(); });
+    document.getElementById('btnAdjunto').addEventListener('click', function () { document.getElementById('fileAdjunto').click(); });
+    document.getElementById('fileImagen').addEventListener('change', function (ev) {
+      Array.prototype.forEach.call(ev.target.files, function (f) { insertarImagen(f).catch(function (e) { errorRedactar(e.message); }); });
+      ev.target.value = '';
+    });
+    document.getElementById('fileAdjunto').addEventListener('change', function (ev) {
+      Array.prototype.forEach.call(ev.target.files, function (f) { adjuntar(f).catch(function (e) { errorRedactar(e.message); }); });
+      ev.target.value = '';
+    });
+
+    document.getElementById('chkCc').addEventListener('change', function (ev) { document.getElementById('cajaCc').hidden = !ev.target.checked; });
+    document.getElementById('chkCco').addEventListener('change', function (ev) { document.getElementById('cajaCco').hidden = !ev.target.checked; });
+
+    // Al cambiar de cuenta en el editor: el mensaje que se estaba leyendo no está en el otro buzón,
+    // así que se quita la opción de adjuntarlo y se explica lo que cambia.
+    document.getElementById('selCuenta').addEventListener('change', function (ev) {
+      var otra = (ev.target.value || cuenta) !== cuenta;
+      document.getElementById('chkOriginal').checked = false;
+      document.getElementById('cajaOriginal').hidden = otra || modo !== 'reenviar';
+      document.getElementById('notaCuenta').textContent = otra
+        ? 'Estás enviando con la otra cuenta: el correo que tienes abierto no está en ese buzón, así que no se adjunta (la cita del mensaje sí se conserva).'
+        : 'El correo sale con la cuenta que elijas aquí; por defecto es la de soporte.';
+    });
+
+    // ================= LA IMAGEN ELEGIDA: VERLA Y AJUSTARLA =================
+    // Al hacer clic en una imagen del cuerpo aparece la barra `barraImagen`: dice cuál es, qué tamaño
+    // tiene y ofrece medidas fijas; el cuadrito azul de la esquina se arrastra para estirarla a mano.
+    // Solo cambia el tamaño con el que se muestra y se envía: el archivo que viaja adjunto es el
+    // original, completo.
+    var imgElegida = null;
+
+    // Ancho útil del cuerpo del mensaje, descontando su padding. Es el «100%» de la barra.
+    function anchoCuerpo() {
+      var ed = document.getElementById('editor');
+      var cs = window.getComputedStyle(ed);
+      var relleno = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+      return Math.max(80, Math.floor(ed.clientWidth - relleno));
+    }
+
+    // El cuadro de agarre ya viene en la ventana (asaImagen): así queda dentro del diálogo modal y
+    // el navegador no bloquea sus clics por estar «fuera» de la ventana.
+    var asa = document.getElementById('asaImagen');
+
+    (function enlazarAsa() {
+      var arrastrando = false;
+      asa.addEventListener('pointerdown', function (ev) {
+        if (!imgElegida) return;
+        arrastrando = true;
+        ev.preventDefault();
+        try { asa.setPointerCapture(ev.pointerId); } catch (_e) { }
+      });
+      asa.addEventListener('pointermove', function (ev) {
+        if (!arrastrando || !imgElegida) return;
+        ponerAncho(Math.round(ev.clientX - imgElegida.getBoundingClientRect().left));
+      });
+      asa.addEventListener('pointerup', function () { arrastrando = false; fijActiva(); });
+      asa.addEventListener('pointercancel', function () { arrastrando = false; });
+    })();
+
+    function posicionarAsa() {
+      if (!asa || !imgElegida) return;
+      var r = imgElegida.getBoundingClientRect();
+      asa.style.left = Math.round(r.right - 6) + 'px';
+      asa.style.top = Math.round(r.bottom - 6) + 'px';
+    }
+
+    // Escribe el ancho en el atributo (lo respetan los clientes de correo, Outlook incluido) y en el
+    // estilo (lo respeta el navegador). El alto se deja automático para que la imagen no se deforme.
+    function ponerAncho(px) {
+      if (!imgElegida) return;
+      var tope = anchoCuerpo();
+      var w = Math.max(60, Math.min(tope, Math.round(px)));
+      imgElegida.setAttribute('width', String(w));
+      imgElegida.style.width = w + 'px';
+      imgElegida.style.height = 'auto';
+      imgElegida.removeAttribute('height');
+      pintarMedida();
+      posicionarAsa();
+    }
+
+    function volverOriginal() {
+      if (!imgElegida) return;
+      imgElegida.removeAttribute('width');
+      imgElegida.removeAttribute('height');
+      imgElegida.style.width = '';
+      imgElegida.style.height = '';
+      pintarMedida();
+      posicionarAsa();
+    }
+
+    function medidaActual() {
+      if (!imgElegida) return null;
+      var w = parseInt(imgElegida.getAttribute('width') || '', 10);
+      if (isNaN(w)) w = Math.round(imgElegida.getBoundingClientRect().width);
+      var h = parseInt(imgElegida.getAttribute('height') || '', 10);
+      if (isNaN(h)) h = Math.round(imgElegida.getBoundingClientRect().height);
+      return { w: w, h: h };
+    }
+
+    function pintarMedida() {
+      var m = medidaActual();
+      if (!m) return;
+      var tope = anchoCuerpo();
+      var pxOriginal = imgElegida.naturalWidth || m.w;
+      var texto = m.w + ' × ' + m.h + ' px';
+      if (!imgElegida.hasAttribute('width')) texto += ' · original ' + pxOriginal + ' px';
+      else texto += ' · ' + Math.round((m.w / tope) * 100) + '% del ancho';
+      document.getElementById('biMedida').textContent = texto;
+    }
+
+    // Marca el botón de medida que corresponde a lo que hay ahora; ninguno si se ajustó a mano.
+    function fijActiva() {
+      var w = parseInt((imgElegida && imgElegida.getAttribute('width')) || '', 10);
+      var tope = anchoCuerpo();
+      Array.prototype.forEach.call(document.querySelectorAll('#barraImagen button[data-ancho]'), function (b) {
+        var v = b.dataset.ancho;
+        var m = null;
+        if (v === 'ancho') m = !isNaN(w) && Math.abs(w - tope) <= 2;
+        else if (v === 'original') m = isNaN(w);
+        else m = !isNaN(w) && Math.abs(w - Math.round(tope * parseInt(v, 10) / 100)) <= 2;
+        b.classList.toggle('activa', !!m);
+      });
+    }
+
+    function seleccionarImagen(img) {
+      // Si la ventana ya está cerrada (la imagen terminó de cargar después de enviar o de descartar),
+      // no se selecciona: la barra y el cuadro no deben reaparecer sobre la bandeja.
+      if (!document.getElementById('dlgRedactar').open) return;
+      if (img !== imgElegida) deseleccionarImagen();
+      imgElegida = img;
+      img.classList.add('sel');
+      var barra = document.getElementById('barraImagen');
+      document.getElementById('biNombre').textContent = img.alt || 'imagen';
+      barra.hidden = false;
+      asa.style.display = '';
+      pintarMedida();
+      fijActiva();
+      posicionarAsa();
+    }
+
+    function deseleccionarImagen() {
+      if (imgElegida) imgElegida.classList.remove('sel');
+      imgElegida = null;
+      document.getElementById('barraImagen').hidden = true;
+      if (asa) asa.style.display = 'none';
+    }
+
+    function quitarImagenElegida() {
+      if (!imgElegida) return;
+      var cid = imgElegida.dataset.cid;
+      imgElegida.remove();
+      deseleccionarImagen();
+      if (cid) {
+        var i = archivos.findIndex(function (a) { return a.cid === cid; });
+        if (i >= 0) archivos.splice(i, 1);
+        pintarArchivos();
+      }
+    }
+
+    // La barra y el cuadro se mueven con cualquier desplazamiento de la ventana (el cuerpo del
+    // mensaje y el propio cuadro de la ventana pueden traer barra de scroll).
+    document.getElementById('dlgRedactar').addEventListener('scroll', posicionarAsa, true);
+    window.addEventListener('scroll', posicionarAsa, true);
+    window.addEventListener('resize', posicionarAsa);
+    document.getElementById('editor').addEventListener('click', function (ev) {
+      var t = ev.target;
+      if (t && t.tagName === 'IMG') seleccionarImagen(t);
+      else deseleccionarImagen();
+    });
+
+    // Con la imagen elegida, Supr o Retroceso quitan solo la imagen (y su incrustación). Al poner el
+    // cursor en el texto la barra se cierra, así que esta tecla no borra nunca sin querer.
+    document.getElementById('editor').addEventListener('keydown', function (ev) {
+      if (!imgElegida) return;
+      if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); quitarImagenElegida(); }
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('#barraImagen button[data-ancho]'), function (b) {
+      b.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+      b.addEventListener('click', function () {
+        if (!imgElegida) return;
+        var v = b.dataset.ancho;
+        if (v === 'original') volverOriginal();
+        else if (v === 'ancho') ponerAncho(anchoCuerpo());
+        else ponerAncho(Math.round(anchoCuerpo() * parseInt(v, 10) / 100));
+        fijActiva();
+      });
+    });
+    document.getElementById('biQuitar').addEventListener('click', function () {
+      if (imgElegida) quitarImagenElegida();
+    });
+
+    // Espera a que el navegador la tenga pintada: sin eso el alto aún vale 0 y el cuadro saldría
+    // en cualquier lado. La imagen ya seleccionada queda a la vista con su marco azul.
+    function esperarCuadro(img) {
+      if (img.complete && img.naturalWidth > 0) { seleccionarImagen(img); return; }
+      img.addEventListener('load', function () { seleccionarImagen(img); }, { once: true });
+      img.addEventListener('error', function () { deseleccionarImagen(); }, { once: true });
+    }
+
+    // ================= ABRIR EL EDITOR =================
+    function limpiarEditor() {
+      deseleccionarImagen();
+      document.getElementById('editor').innerHTML = '';
+      archivos = []; seqCid = 0;
+      direcciones = { para: [], cc: [], cco: [] };
+      pintarPills('para'); pintarPills('cc'); pintarPills('cco');
+      pintarArchivos();
+      document.getElementById('inpAsunto').value = '';
+      document.getElementById('chkCc').checked = false; document.getElementById('cajaCc').hidden = true;
+      document.getElementById('chkCco').checked = false; document.getElementById('cajaCco').hidden = true;
+      document.getElementById('chkOriginal').checked = true;
+      document.getElementById('cajaOriginal').hidden = true;
+      document.getElementById('estadoRedactar').textContent = '';
+      errorRedactar('');
+    }
+
+    function citaHtml(d) {
+      var texto = d.texto || (d.html ? String(d.html).replace(/<[^>]+>/g, ' ') : '');
+      var div = document.createElement('div');
+      var linea = document.createElement('div');
+      linea.textContent = '── Mensaje original · ' + fechaLarga(d.fecha) + ' · ' + d.remitente + ' ──';
+      var cita = document.createElement('blockquote');
+      cita.textContent = texto;
+      div.appendChild(linea); div.appendChild(cita);
+      return div.innerHTML;
+    }
+
+    // Reincrustar las imagenes de un borrador: se descargan de la intranet, se leen en base64 y
+    // vuelven al cuerpo con un cid nuevo, para que al enviarlas de nuevo viajen dentro del correo.
+    function reincrustarInline(editor, d) {
+      Array.prototype.slice.call(editor.querySelectorAll('img[src^="/api/correos/"]')).forEach(function (img) {
+        var idx = parseInt(String(img.getAttribute('src') || '').split('/inline/')[1] || '', 10);
+        if (isNaN(idx)) { img.remove(); return; }
+        var parte = (d.inline || []).filter(function (p) { return p.indice === idx; })[0];
+        fetch(urlPieza(d.uid, 'inline', idx), { credentials: 'same-origin' })
+          .then(function (r) { return r.ok ? r.blob() : null; })
+          .then(function (b) {
+            if (!b) { img.remove(); return; }
+            return leerArchivo(new File([b], (parte && parte.nombre) || 'imagen.png', { type: b.type || 'image/png' }))
+              .then(function (a) {
+                var cid = 'img' + (++seqCid) + '@meditechnosys';
+                a.cid = cid; a.tipo = 'imagen';
+                archivos.push(a);
+                img.src = urlVista(a);
+                img.dataset.cid = cid;
+                img.alt = a.nombre;
+                pintarArchivos();
+              });
+          })
+          .catch(function () { img.remove(); });
+      });
+    }
+
+    function abrirEditor(m, d) {
+      if (!puedeResponder) return;
+      modo = m;
+      limpiarEditor();
+      // Un borrador ya lleva su propia conversacion dentro: no se vuelve a enlazar ni se le pone RE:.
+      enRespuestaA = (m === 'borrador') ? null : (d ? d.uid : null);
+      var titulos = { nuevo: 'Redactar correo', responder: 'Responder', todos: 'Responder a todos',
+        reenviar: 'Reenviar', borrador: 'Editar borrador' };
+      document.getElementById('titRedactar').textContent = titulos[m] || 'Redactar correo';
+
+      if (d) {
+        if (m === 'responder') {
+          agregar('para', d.remitente);
+          document.getElementById('inpAsunto').value = prefijo(d.asunto, 'RE: ');
+          document.getElementById('editor').innerHTML = '<div><br></div>' + citaHtml(d);
+        } else if (m === 'todos') {
+          agregar('para', d.remitente);
+          (String(d.destinatarios || '').split(/[,;]/).concat(d.copias || [])).forEach(function (x) {
+            var t = extraerDireccion(x);
+            if (t && t.toLowerCase() !== String(d.remitente).toLowerCase() &&
+                t.toLowerCase() !== String(correoDe(cuenta)).toLowerCase()) agregar('cc', t);
+          });
+          if ((d.copias || []).length) { document.getElementById('chkCc').checked = true; document.getElementById('cajaCc').hidden = false; }
+          document.getElementById('inpAsunto').value = prefijo(d.asunto, 'RE: ');
+          document.getElementById('editor').innerHTML = '<div><br></div>' + citaHtml(d);
+        } else if (m === 'reenviar') {
+          document.getElementById('inpAsunto').value = prefijo(d.asunto, 'RV: ');
+          document.getElementById('editor').innerHTML = '<div><br></div>' + citaHtml(d);
+          document.getElementById('cajaOriginal').hidden = false;
+          // Las imágenes internas del original se vuelven a incrustar con un cid nuevo.
+          (d.inline || []).forEach(function (p) {
+            if (!p.cid) return;
+            fetch(urlPieza(d.uid, 'inline', p.indice), { credentials: 'same-origin' })
+              .then(function (r) { return r.ok ? r.blob() : null; })
+              .then(function (b) {
+                if (!b) return;
+                return leerArchivo(new File([b], p.nombre, { type: b.type || 'image/png' })).then(function (a) {
+                  var cid = 'img' + (++seqCid) + '@meditechnosys';
+                  a.cid = cid; a.tipo = 'imagen';
+                  archivos.push(a);
+                  var img = document.createElement('img');
+                  img.src = urlVista(a); img.alt = a.nombre; img.dataset.cid = cid;
+                  img.title = a.nombre + ' (' + peso(a.peso) + ') — clic para ajustar el tamaño';
+                  document.getElementById('editor').insertBefore(img, document.getElementById('editor').firstChild);
+                  pintarArchivos();
+                });
+              }).catch(function () { });
+          });
+        } else if (m === 'borrador') {
+          // Se reabre tal como se guardo: destinatarios, copias, asunto y cuerpo con sus imagenes.
+          var editor = document.getElementById('editor');
+          soloDirecciones(d.destinatarios).forEach(function (t) { agregar('para', t); });
+          (d.copias || []).forEach(function (t) { soloDirecciones(t).forEach(function (x) { agregar('cc', x); }); });
+          (d.copiasOcultas || []).forEach(function (t) { soloDirecciones(t).forEach(function (x) { agregar('cco', x); }); });
+          if (direcciones.cc.length) { document.getElementById('chkCc').checked = true; document.getElementById('cajaCc').hidden = false; }
+          if (direcciones.cco.length) { document.getElementById('chkCco').checked = true; document.getElementById('cajaCco').hidden = false; }
+          document.getElementById('inpAsunto').value = (d.asunto && d.asunto !== '(sin asunto)') ? d.asunto : '';
+          editor.innerHTML = d.html ? reescribirCid(d.html, d.inline) : '';
+          if (!d.html) editor.textContent = (d.texto && d.texto !== '(sin contenido)') ? d.texto : '';
+          reincrustarInline(editor, d);
+        }
+      }
+      document.getElementById('dlgRedactar').showModal();
+      // El editor arranca con la cuenta de la bandeja que se esta leyendo (soporte por defecto);
+      // el usuario la puede cambiar antes de enviar.
+      llenarCuentasEditor(cuenta);
+      var primer = document.getElementById(m === 'nuevo' || m === 'borrador' ? 'inpPara' : 'editor');
+      if (primer) primer.focus();
+    }
+
+    // «Juan Méndez <juan@x.mx>, ana@y.mx» → ['juan@x.mx', 'ana@y.mx']
+    function soloDirecciones(txt) {
+      return String(txt || '').split(/[,;]/).map(function (x) { return extraerDireccion(x); })
+        .filter(function (t) { return t && t.indexOf('@') > 0; });
+    }
+
+    function extraerDireccion(t) {
+      var s = String(t || '').trim();
+      var a = s.indexOf('<'), b = s.indexOf('>');
+      if (a >= 0 && b > a) return s.slice(a + 1, b).trim();
+      return s;
+    }
+    function prefijo(asunto, p) {
+      var s = String(asunto || '');
+      return /^(RE|RV)\s*:/i.test(s) ? s : p + s;
+    }
+
+    // ================= ENVIAR Y GUARDAR BORRADOR =================
+    // El cuerpo que se manda: es el mismo que se ve, pero con las imágenes de vuelta a `cid:`.
+    // El navegador pinta el base64 (una data URL pesaría megas en el HTML y el correo iría enorme);
+    // MailKit es quien adjunta el archivo real y lo enlaza por su ContentId, así que aquí se
+    // conserva solo la referencia corta junto con el tamaño ajustado.
+    function htmlParaEnviar() {
+      var original = document.getElementById('editor');
+      var copia = original.cloneNode(true);
+      Array.prototype.forEach.call(copia.querySelectorAll('img'), function (img) {
+        var cid = img.getAttribute('data-cid');
+        if (cid) img.setAttribute('src', 'cid:' + cid);
+        else if (/^data:/i.test(img.getAttribute('src') || '')) img.parentNode.removeChild(img);
+      });
+      return copia.innerHTML;
+    }
+
+    // Recoge lo que hay en el editor. Los cid que siguen en el cuerpo van como imagen incrustada;
+    // los que se quitaron del mensaje tampoco se envían.
+    function payload() {
+      var editor = document.getElementById('editor');
+      var html = htmlParaEnviar();
+      var texto = editor.innerText.trim();
+      var vivos = {};
+      Array.prototype.forEach.call(editor.querySelectorAll('img[data-cid]'), function (img) { vivos[img.dataset.cid] = true; });
+      var adjuntos = archivos
+        .filter(function (a) { return !a.cid || vivos[a.cid]; })
+        .map(function (a) { return { nombre: a.nombre, contentType: a.contentType, base64: a.base64, cid: a.cid || null }; });
+
+      // El identificador del mensaje original solo vale dentro de la cuenta donde se leyó: si se
+      // envia con la otra, se suelta (la cita y el RE:/RV: ya van escritos en el cuerpo).
+      var usar = document.getElementById('selCuenta').value || cuenta;
+      var mismo = usar === cuenta;
+
+      return {
+        para: direcciones.para,
+        cc: direcciones.cc,
+        cco: direcciones.cco,
+        asunto: document.getElementById('inpAsunto').value.trim(),
+        html: html,
+        texto: texto,
+        enRespuestaA: (mismo && modo !== 'nuevo' && modo !== 'borrador') ? enRespuestaA : null,
+        responderTodos: mismo && modo === 'todos',
+        incluirOriginal: mismo && modo === 'reenviar' && document.getElementById('chkOriginal').checked,
+        adjuntos: adjuntos,
+        cuenta: usar
+      };
+    }
+
+    function enviar() {
+      var editor = document.getElementById('editor');
+      if (!direcciones.para.length) { errorRedactar('Escribe al menos un destinatario en «Para».'); return; }
+      if (!editor.innerText.trim() && !/<img/i.test(editor.innerHTML)) { errorRedactar('El mensaje está vacío: escribe algo o inserta una imagen.'); return; }
+
+      var btn = document.getElementById('btnEnviar');
+      var estado = document.getElementById('estadoRedactar');
+      var cuerpo = payload();
+      btn.disabled = true; estado.textContent = 'Enviando…'; errorRedactar('');
+      post('/api/correos/enviar', cuerpo).then(function () {
+        estado.textContent = 'Enviado.';
+        document.getElementById('dlgRedactar').close();
+        recargarTrasEnvio(cuerpo.cuenta);
+      }).catch(function (e) {
+        errorRedactar(String(e.message || e));
+        estado.textContent = '';
+      }).then(function () { btn.disabled = false; });
+    }
+
+    // Un borrador admite quedarse sin destinatarios y sin cuerpo: es justamente lo que se guarda a medias.
+    function guardarBorrador() {
+      var btn = document.getElementById('btnGuardarBorrador');
+      var estado = document.getElementById('estadoRedactar');
+      var cuerpo = payload();
+      btn.disabled = true; estado.textContent = 'Guardando borrador…'; errorRedactar('');
+      var destino = cuerpo.cuenta;
+      post('/api/correos/borrador', cuerpo).then(function () {
+        estado.textContent = 'Borrador guardado.';
+        document.getElementById('dlgRedactar').close();
+        // El borrador queda en la cuenta con la que se redacto: la bandeja se muda ahí para verlo.
+        var cambio = activarCuenta(destino);
+        if (carpeta === 'borradores') { if (cambio) cargarLista(); }
+        else cambiarCarpeta('borradores');
+      }).catch(function (e) {
+        errorRedactar(String(e.message || e));
+        estado.textContent = '';
+      }).then(function () { btn.disabled = false; });
+    }
+
+    // Tras enviar: el correo sale de Borradores y entra en Enviados de la cuenta con la que salio,
+    // asi que la vista se cambia primero a esa cuenta y luego se recarga la carpeta que toca.
+    function recargarTrasEnvio(usada) {
+      activarCuenta(usada);
+      if (carpeta === 'borradores') { cambiarCarpeta('enviados'); return; }
+      cargarLista();
+    }
+
+    // ================= BOTONES =================
+    // Cambiar de carpeta: la lista, el rótulo y el detalle van siempre contra la carpeta activa,
+    // porque los identificadores de los mensajes son propios de cada carpeta.
+    function cambiarCarpeta(c) {
+      if (!c) return;
+      var mismo = c === carpeta;
+      carpeta = c;
+      cerrarDetalle();
+      pintarContexto();
+      cargarLista();
+      if (!mismo && window.scrollTo) window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    Array.prototype.forEach.call(document.querySelectorAll('.pestana'), function (t) {
+      t.addEventListener('click', function () { cambiarCarpeta(t.dataset.carpeta); });
+    });
+
+    document.getElementById('btnActualizar').addEventListener('click', function () { cargarLista(); });
+    document.getElementById('btnCerrarDetalle').addEventListener('click', cerrarDetalle);
+    document.getElementById('btnResponder').addEventListener('click', function () { abrirEditor('responder', detalleAbierto); });
+    document.getElementById('btnResponderTodos').addEventListener('click', function () { abrirEditor('todos', detalleAbierto); });
+    document.getElementById('btnReenviar').addEventListener('click', function () { abrirEditor('reenviar', detalleAbierto); });
+    document.getElementById('btnEditarBorrador').addEventListener('click', function () { abrirEditor('borrador', detalleAbierto); });
+    document.getElementById('btnEliminarBorrador').addEventListener('click', eliminarBorrador);
+    document.getElementById('btnRedactar').addEventListener('click', function () { abrirEditor('nuevo', null); });
+    document.getElementById('btnEnviar').addEventListener('click', enviar);
+    document.getElementById('btnGuardarBorrador').addEventListener('click', guardarBorrador);
+    document.getElementById('btnCancelarRedactar').addEventListener('click', function () { document.getElementById('dlgRedactar').close(); });
+    // Al cerrar la ventana de redacción se suelta la imagen elegida: la barra y el cuadro azul no
+    // deben quedar flotando sobre otra pantalla.
+    document.getElementById('dlgRedactar').addEventListener('close', deseleccionarImagen);
+
+    // Eliminar un borrador: se quita del servidor (no queda en una papelera de la intranet).
+    function eliminarBorrador() {
+      if (uidAbierto === null) return;
+      if (!window.confirm('¿Eliminar este borrador? Se borra del buzón y no se puede recuperar.')) return;
+      var btn = document.getElementById('btnEliminarBorrador');
+      btn.disabled = true;
+      del('/api/correos/' + uidAbierto + qsCarpeta()).then(function () {
+        cerrarDetalle();
+        cargarLista();
+      }).catch(function (e) {
+        aviso(document.getElementById('avisoDetalle'), 'No se pudo eliminar el borrador', String(e.message || e));
+      }).then(function () { btn.disabled = false; });
+    }
+
+    // Arranque: rótulos de la pestaña activa, qué buzón se va a usar y luego la bandeja.
+    pintarContexto();
+    cargarBuzon().then(cargarLista);
+  })();
+  </script>
+<script src="/js/ubicacion.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+@model IReadOnlyList<Meditechnosys.Intranet.Models.SystemStatus>
+<section aria-labelledby="sistemas">
+  <h2 id="sistemas">Sistemas</h2>
+  <div class="status" id="status">
+    @foreach (var s in Model)
+    {
+      <div><span>@s.Name</span><code class="@(s.State == "ok" ? "" : "warn")">@s.Label</code></div>
+    }
+  </div>
+</section>

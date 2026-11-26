@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <script src="/js/theme.js?v=20261119e"></script>
+  <script src="/js/desplegable-nodos.js?v=20261030b"></script>
+  <script src="/js/dicom-cab.js?v=20261030b"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Envío de estudios DICOM — Meditechnosys</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --panel: #ffffff;
+      --panel-2: #f7f4ea;
+      --borde: #d9d9d9;
+      --texto: #111111;
+      --suave: #555555;
+      --azul: #0d47a1;
+      --azul-t: #1565c0;
+      --dorado: #c9a227;
+      --dorado-t: #a8861d;
+      --error: #b3261e;
+      --card: rgba(255,255,255,.55);
+      --text: #111111;
+      --muted: #555555;
+      --accent: #0d47a1;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --err: #b3261e;
+      --row-hover: rgba(13, 71, 161, .06);
+      --selected: rgba(13, 71, 161, .1);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--texto);
+      padding: 16px;
+      min-height: 100vh;
+    }
+    .fondo-logo {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background: url("/img/logo-meditechnosys.png") center / contain no-repeat;
+      mix-blend-mode: multiply;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      margin: -16px -16px 16px;
+      background: #111111;
+      color: #ffffff;
+      padding: 13px 22px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 3px solid var(--dorado);
+      box-shadow: 0 2px 8px rgba(0,0,0,.28);
+      flex-wrap: wrap;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: .02em;
+      color: var(--dorado);
+    }
+    header .logo-centro {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: var(--dorado);
+      pointer-events: none;
+      line-height: 1.3;
+      white-space: nowrap;
+      font-family: "Segoe UI", "Trebuchet MS", system-ui, sans-serif;
+      font-size: 21px;
+      font-weight: 700;
+      letter-spacing: .04em;
+    }
+    header .logo-centro span {
+      display: block;
+      font-size: 10px;
+      font-weight: 400;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      opacity: .85;
+      margin-top: 4px;
+    }
+    header .badge {
+      font-size: 12px;
+      color: #eeeeee;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    header .botones-nav { display: flex; gap: 8px; margin-left: auto; }
+    header .boton-nav {
+      background: var(--panel-2);
+      color: var(--texto);
+      border: 1px solid var(--borde);
+      padding: 6px 12px;
+      font-size: 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    header .boton-nav:hover { background: var(--panel); }
+    main { max-width: 1200px; margin: 0 auto; position: relative; z-index: 1; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--borde);
+      border-radius: 8px;
+      padding: 20px 22px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 5px rgba(0,0,0,.12);
+    }
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 18px;
+      font-weight: 600;
+      display: inline-block;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--dorado);
+    }
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: var(--suave);
+      font-weight: 600;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid #9e9e9e;
+      background: #ffffff;
+      color: var(--texto);
+      font-size: 14px;
+      color-scheme: light;
+    }
+    input:focus, select:focus { outline: 2px solid var(--dorado); outline-offset: 1px; }
+    .fila-nodos {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .fila-nodos.uno { grid-template-columns: minmax(240px, 1fr) 1fr; }
+    .panel-lado {
+      border-left: 3px solid var(--dorado);
+      padding-left: 14px;
+      font-size: .85rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .panel-lado b { color: var(--text); }
+    .row-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+      align-items: center;
+    }
+    button {
+      font: inherit;
+      cursor: pointer;
+      border-radius: 6px;
+      padding: 10px 18px;
+      border: 1px solid var(--borde);
+    }
+    button:disabled { opacity: .45; cursor: default; }
+    .btn-primary { background: var(--azul); border-color: var(--azul); color: #fff; font-weight: 700; }
+    .btn-primary:hover:not(:disabled) { background: var(--azul-t); }
+
+    /* El botón de la carpeta es una <label> enlazada al <input type=file>: el navegador abre el
+       selector por su cuenta, sin JavaScript. Hay PCs donde el `.click()` desde script queda
+       bloqueado por políticas del navegador o por el propio control de archivos; con la etiqueta
+       funciona igual que hacer clic sobre el cuadro de selección nativo. */
+    label.btn-carpeta {
+      display: inline-block;
+      background: var(--azul);
+      border: 1px solid var(--azul);
+      color: #fff;
+      font-weight: 700;
+      border-radius: 6px;
+      padding: 10px 18px;
+      cursor: pointer;
+    }
+    label.btn-carpeta:hover { background: var(--azul-t); }
+    label.btn-carpeta:focus-within { outline: 2px solid var(--dorado); outline-offset: 2px; }
+    label.btn-carpeta input[type=file] {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+    /* Un <label> no tiene propiedad `disabled`: se apaga con clase y con el candado de JS. */
+    label.btn-carpeta.apagado { opacity: .45; background: var(--azul); cursor: default; pointer-events: none; }
+
+    /* Soltar la carpeta encima de la tabla: otra vía cuando el navegador no deja elegir carpeta. */
+    #tabArchivos.soltando { outline: 2px dashed var(--dorado); outline-offset: -8px; }
+    .btn-secondary { background: #fff; color: var(--texto); border-color: #111111; }
+    .btn-secondary:hover:not(:disabled) { background: var(--panel-2); }
+    .btn-gold {
+      background: var(--dorado);
+      border-color: var(--dorado-t);
+      color: #241a00;
+      font-weight: 700;
+    }
+    .btn-gold:hover:not(:disabled) { filter: brightness(1.07); }
+    .btn-cancel { background: var(--error); border-color: var(--error); color: #fff; font-weight: 700; }
+    .btn-cancel:hover:not(:disabled) { filter: brightness(1.12); }
+    .btn-mini { padding: 6px 12px; font-size: 12px; }
+    .hint { font-size: .8rem; color: var(--muted); }
+    kbd {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: .78rem;
+      border: 1px solid var(--borde);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      padding: 1px 5px;
+      background: #fff;
+      color: var(--texto);
+    }
+    .tabs { display: flex; gap: 4px; margin-bottom: -1px; position: relative; z-index: 2; flex-wrap: wrap; }
+    .tabs button {
+      background: var(--panel-2);
+      border: 1px solid var(--borde);
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      padding: 10px 18px;
+      font-size: 14px;
+    }
+    .tabs button.on {
+      background: var(--card);
+      font-weight: 700;
+      color: var(--azul);
+      border-color: var(--dorado);
+    }
+    .tab { display: none; }
+    .tab.on { display: block; }
+    .table-wrap { overflow: auto; max-height: 46vh; border-radius: 8px; border: 1px solid var(--borde); }
+    table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    th, td { padding: 9px 11px; text-align: left; border-bottom: 1px solid #eceff1; background: transparent; }
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: var(--panel-2);
+      font-size: 11px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: var(--suave);
+      border-bottom: 2px solid var(--borde);
+      white-space: nowrap;
+    }
+    tbody tr:hover { background: var(--row-hover); }
+    tbody tr.selected { background: var(--selected); }
+    td.det { color: var(--muted); font-size: .82rem; max-width: 420px; word-break: break-word; }
+    .st-ok { color: #14532d; font-weight: 600; }
+    .st-warn { color: #92400e; font-weight: 600; }
+    .st-err { color: var(--err); font-weight: 600; }
+    .st-info { color: var(--muted); }
+    .st-muted { color: var(--suave); }
+    .empty { text-align: center; padding: 24px 12px; color: var(--suave); }
+    #log {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: .78rem;
+      max-height: 170px;
+      overflow-y: auto;
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 10px 12px;
+      border: 1px solid var(--borde);
+      white-space: pre-wrap;
+      line-height: 1.45;
+    }
+    .log-ok { color: var(--ok); }
+    .log-err { color: var(--err); }
+    .log-warn { color: var(--warn); }
+    .log-info { color: var(--muted); }
+    .progress-panel {
+      margin-top: 12px;
+      padding: 12px 14px;
+      background: var(--bg);
+      border: 1px solid var(--borde);
+      border-radius: 10px;
+      display: none;
+    }
+    .progress-panel.active { display: block; }
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: .9rem;
+    }
+    .progress-header .pct { font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+    .progress-track { height: 12px; background: var(--borde); border-radius: 999px; overflow: hidden; }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), #60a5fa);
+      border-radius: 999px;
+      transition: width .25s ease;
+    }
+    .progress-detail { margin-top: 7px; font-size: .8rem; color: var(--muted); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      gap: 12px 16px;
+    }
+    @media (max-width: 780px) {
+      .fila-nodos, .fila-nodos.uno { grid-template-columns: 1fr; }
+      header .logo-centro { display: none; }
+      dialog.modal .fila-campos { grid-template-columns: 1fr; }
+    }
+
+    /* ---- Editar las etiquetas de un estudio antes de enviarlo ----
+       El botón va en su propia columna de la tabla y la ventana es un <dialog> nativo:
+       theme.css ya le pone el fondo y el texto del tema (día/noche) con la clase .modal. */
+    .btn-editar {
+      padding: 5px 10px;
+      font-size: 11.5px;
+      border-radius: 5px;
+      border: 1px solid var(--borde);
+      background: transparent;
+      color: var(--azul);
+      white-space: nowrap;
+    }
+    .btn-editar:hover:not(:disabled) { background: var(--panel-2); border-color: var(--azul); }
+    .btn-editar.editado { border-color: var(--dorado); color: var(--dorado-t); font-weight: 700; }
+
+    dialog.modal {
+      border: 1px solid var(--borde);
+      border-radius: 10px;
+      padding: 0;
+      width: min(480px, calc(100% - 32px));
+      box-shadow: 0 10px 34px rgba(0, 0, 0, .28);
+    }
+    dialog.modal::backdrop { background: rgba(0, 0, 0, .5); }
+    dialog.modal form { display: grid; gap: 13px; padding: 18px 20px 20px; }
+    dialog.modal h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--texto);
+      padding-bottom: 9px;
+      border-bottom: 2px solid var(--dorado);
+    }
+    dialog.modal .fila-campos { display: grid; grid-template-columns: 130px 1fr; gap: 13px; }
+    dialog.modal .quien,
+    dialog.modal .nota { font-size: .78rem; color: var(--muted); margin: 0; line-height: 1.55; word-break: break-word; }
+    dialog.modal .nota b { color: var(--texto); }
+    dialog.modal .acciones { display: flex; gap: 8px; margin-top: 2px; flex-wrap: wrap; align-items: center; }
+    dialog.modal .acciones .derecha { display: flex; gap: 8px; margin-left: auto; }
+  </style>
+  <link rel="stylesheet" href="/css/theme.css?v=20261120f" />
+  <link rel="stylesheet" href="/css/hoja-fecha.css?v=20261104c" />
+  <script src="/js/hoja-fecha.js?v=20261106a"></script>
+</head>
+<body class="theme-panel">
+  <header>
+    <h1>Envío de estudios DICOM</h1>
+    <div class="logo-centro">Meditechnosys<span>Medical Technology Solutions</span></div>
+    <span class="badge" id="statusBadge">Cargando…</span>
+    <div class="botones-nav">
+      <button class="boton-nav" onclick="history.back()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Regresar
+      </button>
+      <button class="boton-nav" onclick="window.location.href='/'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        Home
+      </button>
+    </div>
+  </header>
+  <div class="fondo-logo" aria-hidden="true"></div>
+
+  <main class="page-wide">
+    <div class="tabs" role="tablist">
+      <button type="button" class="on" id="tabBtnArchivos" role="tab" aria-selected="true">Enviar estudios</button>
+      <button type="button" id="tabBtnReenvio" role="tab" aria-selected="false" hidden>
+        Traer de otro servidor y reenviar
+      </button>
+    </div>
+
+    <!-- ================================================== PESTAÑA 1 -->
+    <section class="tab on card" id="tabArchivos" role="tabpanel">
+      <h2>Servidor PACS destino</h2>
+      <div class="fila-nodos uno">
+        <div>
+          <label for="destinoEnvio">Hacia dónde se envía</label>
+          <select id="destinoEnvio" size="4" aria-describedby="hintNodo">
+            <option disabled value="">Cargando nodos…</option>
+          </select>
+          <div class="row-actions" style="margin-top:8px;">
+            <button type="button" class="btn-secondary btn-mini" id="btnEcoDestino">Probar conexión</button>
+          </div>
+        </div>
+        <div class="panel-lado">
+          <p style="margin:0 0 8px;">Las imágenes salen de esta intranet con el AE Title emisor
+            <b id="aeEmisor">Medimport</b>. Ese AE debe estar registrado en el PACS destino; si no lo
+            está, la prueba de conexión falla y el envío es rechazado.</p>
+          <p style="margin:0 0 8px;">Se envían a los mismos servidores de los que se descargan
+            (<b id="aeNodos">4 nodos</b>), en lotes de <b id="aeLote">50</b> imágenes por asociación,
+            sin transcodificar: cada imagen viaja con su propia sintaxis de transferencia.</p>
+          <p style="margin:0;" id="hintNodo">Un solo destino por envío. Para mandarlos a dos servidores
+            a la vez usa la pestaña «Traer de otro servidor y reenviar».</p>
+        </div>
+      </div>
+
+      <h2 style="margin-top:22px;">Estudios por enviar</h2>
+      <div class="row-actions" style="margin-top:0;">
+        <label class="btn-carpeta" id="btnAddFolder" title="Elige la carpeta que trae los estudios DICOM; también puedes arrastrarla y soltarla sobre la lista">
+          Agregar carpeta de estudios…
+          <input type="file" id="pickFolder" webkitdirectory directory multiple />
+        </label>
+        <button type="button" class="btn-secondary" id="btnRemove">Quitar marcados</button>
+        <button type="button" class="btn-secondary" id="btnClear">Limpiar lista</button>
+        <span class="hint" id="conteo">0 estudios · 0 imágenes · 0 MB</span>
+      </div>
+      <p class="hint" id="hintCarpeta" style="margin:8px 0 0;">
+        Si al tocar el botón no se abre la ventana de carpetas, suelta la carpeta directamente sobre
+        la lista de abajo; la pantalla lee las cabeceras de la misma manera.
+      </p>
+
+      <div class="table-wrap" style="margin-top:12px;">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:36px;"></th>
+              <th>Nombre</th>
+              <th style="width:130px;">ID Paciente</th>
+              <th>Descripción</th>
+              <th style="width:90px;">Modalidad</th>
+              <th style="width:80px;">Imágenes</th>
+              <th style="width:120px;">Estado</th>
+              <th style="width:230px;">Detalle</th>
+              <th style="width:88px;">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyArchivos">
+            <tr><td colspan="9" class="empty">Agrega una carpeta con estudios DICOM para empezar.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="progress-panel" id="progArchivos">
+        <div class="progress-header">
+          <span id="paLabel">Enviando…</span>
+          <span class="pct" id="paPct">0%</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" id="paFill"></div></div>
+        <div class="progress-detail" id="paDetail">Preparando…</div>
+      </div>
+
+      <div class="row-actions">
+        <button type="button" class="btn-gold" id="btnSend">Enviar al PACS</button>
+        <button type="button" class="btn-cancel" id="btnSendCancel" disabled>Cancelar</button>
+        <button type="button" class="btn-secondary" id="btnRetryPending" disabled>Reintentar pendientes</button>
+      </div>
+      <p class="hint" style="margin:8px 0 0;">
+        Al reintentar solo se vuelven a mandar los estudios que quedaron en Pendiente, Error,
+        Con errores, Con avisos o Cancelado; los ya subidos se dejan tranquilos.
+      </p>
+    </section>
+
+    <!-- ================================================== PESTAÑA 2 -->
+    <section class="tab card" id="tabReenvio" role="tabpanel">
+      <h2>Servidores del reenvío</h2>
+      <div class="fila-nodos">
+        <div>
+          <label for="origenReenvio">De dónde se trae (origen)</label>
+          <select id="origenReenvio" multiple></select>
+          <div class="row-actions" style="margin-top:8px;">
+            <button type="button" class="btn-secondary btn-mini" id="btnEcoOrigen">Probar conexión</button>
+          </div>
+        </div>
+        <div>
+          <label for="destinoReenvio">A dónde se envía (destino)</label>
+          <select id="destinoReenvio" multiple></select>
+          <div class="row-actions" style="margin-top:8px;">
+            <span class="hint">Despliega y marca más de un destino: cada estudio se manda a todos.</span>
+          </div>
+        </div>
+      </div>
+      <div class="panel-lado" style="border-left-color:var(--azul); margin-top:14px;">
+        <p style="margin:0;">La búsqueda y la descarga se hacen con el AE <b id="aeConsultor">MEDI</b>
+          (las imágenes del C-MOVE llegan al receptor <b id="aePuerto">11113</b> de este servidor) y el
+          reenvío sale como <b id="aeEmisor2">Medimport</b>. El nodo destino no puede ser el mismo del
+          que se trae.</p>
+      </div>
+
+      <h2 style="margin-top:22px;">Criterios de búsqueda</h2>
+      <div class="grid">
+        <div>
+          <label for="patientId">Patient ID</label>
+          <input id="patientId" type="text" placeholder="Ej. 123456 (coincide parcial)" />
+        </div>
+        <div>
+          <label for="patientName">Nombre paciente</label>
+          <input id="patientName" type="text" placeholder="APELLIDO o APELLIDO^NOMBRE" />
+        </div>
+        <div>
+          <label for="modality">Modalidad</label>
+          <input id="modality" type="text" placeholder="CT, MR, DX, US…" />
+        </div>
+        <div>
+          <label for="accession">Accession Number</label>
+          <input id="accession" type="text" />
+        </div>
+        <div>
+          <label for="dateFrom">Fecha desde</label>
+          <input id="dateFrom" type="date" />
+        </div>
+        <div>
+          <label for="dateTo">Fecha hasta</label>
+          <input id="dateTo" type="date" />
+        </div>
+      </div>
+      <div class="row-actions">
+        <button type="button" class="btn-primary" id="btnBuscar">Buscar estudios</button>
+        <button type="button" class="btn-secondary" id="btnHoy">Hoy</button>
+        <button type="button" class="btn-secondary" id="btn7">Últimos 7 días</button>
+        <button type="button" class="btn-secondary" id="btnLimpiar">Limpiar</button>
+        <span class="hint">Escribe al menos un criterio; sin criterios el PACS no se consulta.</span>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin:20px 0 10px;">
+        <h2 style="margin:0;">Resultados</h2>
+        <div class="hint">
+          <strong id="countTotal">0</strong> encontrados ·
+          <strong id="countSelected">0</strong> seleccionados
+        </div>
+      </div>
+
+      <div class="row-actions" style="margin-top:0;">
+        <button type="button" class="btn-gold" id="btnReenviar" disabled>Traer y reenviar</button>
+        <button type="button" class="btn-secondary" id="btnSelTodos">Seleccionar todos</button>
+        <button type="button" class="btn-secondary" id="btnSelNinguno">Ninguno</button>
+        <button type="button" class="btn-cancel" id="btnReenviarCancel" disabled>Cancelar</button>
+      </div>
+
+      <div class="progress-panel" id="progReenvio">
+        <div class="progress-header">
+          <span id="prLabel">Reenviando…</span>
+          <span class="pct" id="prPct">0%</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" id="prFill"></div></div>
+        <div class="progress-detail" id="prDetail">Preparando…</div>
+      </div>
+
+      <div class="table-wrap" style="margin-top:12px;">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:36px;"></th>
+              <th>Paciente</th>
+              <th>Patient ID</th>
+              <th>Fecha</th>
+              <th>Descripción</th>
+              <th>Modalidad</th>
+              <th># Imágenes</th>
+              <th>Origen</th>
+              <th style="width:120px;">Estado</th>
+              <th style="width:280px;">Detalle</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyEstudios">
+            <tr><td colspan="10" class="empty">Busca estudios en el nodo de origen para poder reenviarlos.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Estado</h2>
+      <div id="log"></div>
+    </section>
+  </main>
+
+  <!--
+    Edición de las etiquetas de un estudio antes de subirlo. Lo que se escribe aquí no se queda
+    solo en la pantalla: se manda junto con los archivos (campo «ediciones» del formulario) y el
+    servidor lo escribe en el dataset de cada imagen justo antes del C-STORE.
+  -->
+  <dialog class="modal" id="mdlEditar" aria-labelledby="edTitulo">
+    <form id="frmEditar">
+      <h3 id="edTitulo">Editar etiquetas DICOM del estudio</h3>
+      <p class="quien" id="edQuien"></p>
+
+      <label for="edNombre">Nombre del paciente
+        <input id="edNombre" type="text" maxlength="64" autocomplete="off" spellcheck="false"
+               placeholder="APELLIDOS, NOMBRE" />
+      </label>
+      <label for="edPaciente">ID Paciente
+        <input id="edPaciente" type="text" maxlength="64" autocomplete="off" spellcheck="false" />
+      </label>
+      <div class="fila-campos">
+        <label for="edModalidad">Modalidad
+          <input id="edModalidad" type="text" maxlength="16" autocomplete="off" spellcheck="false"
+                 placeholder="CT, MR, US…" />
+        </label>
+        <label for="edDescripcion">Descripción del estudio
+          <input id="edDescripcion" type="text" maxlength="64" autocomplete="off" spellcheck="false" />
+        </label>
+      </div>
+
+      <p class="nota">
+        El nombre se escribe <b>«apellidos, nombre»</b>: la coma se convierte al separador que usa
+        DICOM, así que en el PACS queda <b>APELLIDOS^NOMBRE</b>. Deja en blanco lo que no quieras
+        tocar. La corrección se aplica a las <b id="edImg">0</b> imágenes del estudio al enviarlas;
+        los identificadores de estudio, serie e imagen no cambian.
+      </p>
+
+      <div class="acciones">
+        <button type="button" class="btn-secondary btn-mini" id="edRestaurar" hidden>
+          Restaurar valores originales
+        </button>
+        <div class="derecha">
+          <button type="button" class="btn-secondary btn-mini" id="edCancelar">Cancelar</button>
+          <button type="submit" class="btn-primary btn-mini" id="edGuardar">Guardar corrección</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const API = "/api/dicom/enviar";
+
+    // «Fecha desde» y «fecha hasta» se eligen con la hoja compartida (/js/hoja-fecha.js):
+    // Día, Mes, Año o Rango en un solo cuadro. Escribe en #dateFrom/#dateTo, que es lo que
+    // lee buscar(); los botones «Hoy», «Últimos 7 días» y «Limpiar» siguen poniendo las
+    // fechas ellos solos y la hoja se actualiza al hacerlo.
+    if (window.HojaFecha) {
+      HojaFecha.instalar({ desde: "dateFrom", hasta: "dateTo", titulo: "Periodo", cualquier: "Cualquier día" });
+    }
+
+    let cfg = { emisor: "Medimport", consultor: "MEDI", puertoRecepcion: 11113, lote: 50, limiteMB: 400, puedeReenviar: false, nodos: [] };
+    let paquetes = [];          // estudios leídos de la carpeta: { uid, nombre, ..., archivos:[{file,etiqueta}] }
+    let mapaPaquetes = new Map();
+    let clavesVistas = new Set();   // "ruta|bytes" para no agregar dos veces la misma carpeta
+    let sopVistos = new Set();      // StudyUID|SOPUID: la misma imagen repetida no cuenta dos veces
+    let descartados = null;         // fila aparte con lo que no resultó ser DICOM
+    let leyendo = false;
+    let estudios = [];          // resultados del C-FIND, con estado/detalle del reenvío
+    let envioCtl = null;        // AbortController del envío de archivos
+    let jobId = null;           // trabajo de reenvío en curso
+    let pollTimer = null;
+
+    const LOTE_MB = 350;        // cada petición de subida trae como máximo esta cantidad
+    const LOTE_ARCHIVOS = 300;
+    const MAX_FILAS = 400;      // la tabla no pinta más de esto; se envían todos de todos modos
+    const CONC_CABECERAS = 8;   // cabeceras DICOM leídas a la vez al agregar una carpeta
+
+    function log(msg, type = "info") {
+      const el = $("log");
+      const line = document.createElement("div");
+      line.className = "log-" + type;
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      el.appendChild(line);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function escapeHtml(v) {
+      return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function mb(bytes) { return (bytes / 1048576).toFixed(1); }
+
+    // Color según el estado. Los de la pestaña de envío son por estudio (Subido, Pendiente…);
+    // los de reenvío los reporta el trabajo del servidor. Se traduce a una clase fija porque
+    // «Con errores» lleva espacio y no sirve como nombre de clase.
+    const CLASES_ESTADO = {
+      Guardado: "st-ok", Completado: "st-ok", Subido: "st-ok",
+      Advertencia: "st-warn", "Con errores": "st-warn", "Con avisos": "st-warn", Enviando: "st-warn",
+      Error: "st-err",
+      Cancelado: "st-muted", Descartado: "st-muted", "En cola": "st-info", Pendiente: "st-info",
+      Descargando: "st-warn"
+    };
+    function estadoClase(e) { return CLASES_ESTADO[String(e || "").trim()] || "st-info"; }
+
+    function setProgress(panel, pct, label, detail) {
+      $(panel).classList.add("active");
+      const fillId = panel === "progArchivos" ? "paFill" : "prFill";
+      const pctId = panel === "progArchivos" ? "paPct" : "prPct";
+      const lblId = panel === "progArchivos" ? "paLabel" : "prLabel";
+      const detId = panel === "progArchivos" ? "paDetail" : "prDetail";
+      // pct = null deja el porcentaje ya mostrado (se usa al cancelar, para no volverlo a 0).
+      const base = (pct === null || pct === undefined)
+        ? (parseInt($(pctId).textContent, 10) || 0) : pct;
+      const p = Math.max(0, Math.min(100, Math.round(base)));
+      $(pctId).textContent = p + "%";
+      $(lblId).textContent = label || "";
+      $(detId).textContent = detail || "";
+      $(fillId).style.width = p + "%";
+    }
+    function hideProgress(panel) { $(panel).classList.remove("active"); }
+
+    // ------------------------------------------------------------------ arranque
+
+    // Llena el <select> oculto y monta (o refresca) su lista desplegable encima.
+    function llenarDesplegable(sel, nodos, multiple) {
+      sel.innerHTML = "";
+      for (const n of nodos) {
+        const o = document.createElement("option");
+        o.value = n.aeTitle;
+        o.textContent = n.name && n.name !== n.aeTitle ? `${n.name} (${n.aeTitle})` : n.aeTitle;
+        o.title = `${n.host}:${n.port}`;
+        if (!multiple) o.selected = sel.options.length === 0;   // el primero, ya elegido
+        sel.appendChild(o);
+      }
+      if (sel.desplegable) sel.desplegable.refrescar();
+      else DesplegableNodos(sel, {
+        multiple,
+        ninguno: "Ninguno marcado"
+      });
+    }
+
+    function opciones(sel) { return Array.from(sel.options).filter(o => o.value); }
+    function elegidos(sel) { return opciones(sel).filter(o => o.selected).map(o => o.value); }
+
+    async function cargar() {
+      try {
+        const res = await fetch(`${API}/nodos`);
+        if (!res.ok) throw new Error(res.status === 403 ? "Sin permiso para esta pantalla." : res.statusText);
+        cfg = await res.json();
+        cfg.nodos = cfg.nodos || [];
+
+        llenarDesplegable($("destinoEnvio"), cfg.nodos, false);
+        llenarDesplegable($("origenReenvio"), cfg.nodos, true);
+        llenarDesplegable($("destinoReenvio"), cfg.nodos, true);
+        // En el reenvío conviene arrancar con todos los destinos disponibles a la vista,
+        // pero sin elegir ninguno para no mandar a 4 sitios por accidente.
+        opciones($("origenReenvio")).forEach(o => o.selected = true);
+        $("origenReenvio").desplegable.refrescar();
+
+        $("aeEmisor").textContent = cfg.emisor;
+        $("aeEmisor2").textContent = cfg.emisor;
+        $("aeConsultor").textContent = cfg.consultor;
+        $("aePuerto").textContent = cfg.puertoRecepcion;
+        $("aeLote").textContent = cfg.lote;
+        $("aeNodos").textContent = `${cfg.nodos.length} nodos`;
+        $("statusBadge").textContent = `${cfg.nodos.length} nodos PACS · emisor ${cfg.emisor}`;
+
+        if (cfg.puedeReenviar) $("tabBtnReenvio").hidden = false;
+        log(`Pantalla lista. Emisor de imágenes: ${cfg.emisor} · consultor: ${cfg.consultor}.`, "ok");
+        if (!cfg.puedeReenviar)
+          log("Tu perfil no tiene «dicom.reenviar», así que solo puedes subir carpetas de estudios. " +
+              "Pídele al Administrador que te dé ese permiso en Roles y permisos.", "info");
+      } catch (e) {
+        $("statusBadge").textContent = "Sin conexión con la API";
+        log("No se pudieron cargar los nodos PACS: " + e.message, "err");
+      }
+    }
+
+    function cambiarTab(que) {
+      const esArchivos = que === "archivos";
+      $("tabBtnArchivos").classList.toggle("on", esArchivos);
+      $("tabBtnReenvio").classList.toggle("on", !esArchivos);
+      $("tabBtnArchivos").setAttribute("aria-selected", esArchivos);
+      $("tabBtnReenvio").setAttribute("aria-selected", !esArchivos);
+      $("tabArchivos").classList.toggle("on", esArchivos);
+      $("tabReenvio").classList.toggle("on", !esArchivos);
+    }
+    $("tabBtnArchivos").onclick = () => cambiarTab("archivos");
+    $("tabBtnReenvio").onclick = () => cambiarTab("reenvio");
+
+    // ------------------------------------------------------------- prueba conexión
+
+    async function eco(aeTitle, emisor, boton) {
+      if (!aeTitle) { log("Elige primero un nodo en la lista.", "err"); return; }
+      boton.disabled = true;
+      const antes = boton.textContent;
+      boton.textContent = "Probando…";
+      try {
+        const res = await fetch(`${API}/eco`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ aeTitle, emisor })
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(d.error || d.detail || res.statusText);
+        log(`${d.ok ? "Conexión OK" : "Sin conexión"} — ${d.detalle}`, d.ok ? "ok" : "err");
+        if (!d.ok) log(`Recuerda: el AE ${d.emisor} debe estar registrado en ${d.destino} (${d.direccion}).`, "warn");
+      } catch (e) {
+        log("No se pudo probar la conexión: " + e.message, "err");
+      } finally {
+        boton.textContent = antes;
+        boton.disabled = false;
+      }
+    }
+    $("btnEcoDestino").onclick = () => eco($("destinoEnvio").value, true, $("btnEcoDestino"));
+    $("btnEcoOrigen").onclick = () => {
+      const qs = elegidos($("origenReenvio"));
+      if (qs.length === 0) { log("Marca al menos un nodo de origen.", "err"); return; }
+      // Se prueba uno por uno: cada PACS tiene su propio registro del AE MEDI.
+      qs.reduce((p, ae) => p.then(() => eco(ae, false, $("btnEcoOrigen"))), Promise.resolve());
+    };
+
+    // ------------------------------------------------- carpeta → estudios (tabla)
+
+    /*
+     * La carpeta se lee aquí, en el navegador: de cada archivo se toman solo sus cabeceras DICOM
+     * (dicom-cab.js) y se agrupan por StudyInstanceUID. La tabla muestra entonces un renglón por
+     * estudio —nombre, ID, descripción, modalidad y número de imágenes— y el estado dice si ese
+     * estudio ya está subido o sigue pendiente, en vez de una fila por cada imagen.
+     */
+    function nuevoPaquete(cab) {
+      const p = {
+        uid: cab.studyUid,
+        nombre: cab.nombre || "(sin nombre)",
+        patientId: cab.patientId || "",
+        descripcion: cab.descripcion || "",
+        modalidad: cab.modalidad || "",
+        archivos: [],
+        bytes: 0,
+        estado: "Pendiente",
+        detalle: "",
+        marcado: false,
+        esDescarte: false,
+        // Lo que traía el archivo, para poder revertir la corrección. `editado` se pone al
+        // guardar la ventana de edición y `edicion` es lo que se le manda al servidor.
+        orig: { nombre: cab.nombre || "(sin nombre)", patientId: cab.patientId || "",
+                descripcion: cab.descripcion || "", modalidad: cab.modalidad || "" },
+        editado: false,
+        edicion: null
+      };
+      mapaPaquetes.set(p.uid, p);
+      paquetes.push(p);
+      return p;
+    }
+
+    function meter(p, f, etiqueta, sop) {
+      p.archivos.push({ file: f, etiqueta, clave: etiqueta + "|" + f.size, sop });
+      p.bytes += f.size;
+    }
+
+    // Al quitar un estudio de la lista se liberan sus claves, para poder volver a agregarlo.
+    function quitarDeVistas(p) {
+      for (const a of p.archivos) {
+        clavesVistas.delete(a.clave);
+        if (a.sop) sopVistos.delete(a.sop);
+      }
+    }
+
+    function filaDescartados() {
+      if (descartados) return descartados;
+      descartados = {
+        uid: "", nombre: "(archivos que no se leyeron como DICOM)", patientId: "", descripcion: "",
+        modalidad: "", archivos: [], bytes: 0, estado: "Descartado",
+        detalle: "O no son DICOM o el lector no reconoció su cabecera: se dejan fuera del envío.",
+        marcado: false, esDescarte: true
+      };
+      paquetes.push(descartados);
+      return descartados;
+    }
+
+    /**
+     * Enciende o apaga el acceso a la carpeta. El botón es una `<label>`, y una etiqueta no tiene
+     * propiedad `disabled`, así que se apaga por clase (visual) y por el input (el que de verdad
+     * abre la ventana de Windows).
+     */
+    function bloqueoCarpeta(apagado) {
+      $("pickFolder").disabled = !!apagado;
+      $("btnAddFolder").classList.toggle("apagado", !!apagado);
+      $("btnAddFolder").setAttribute("aria-disabled", apagado ? "true" : "false");
+    }
+
+    // Acepta [{ f, etiqueta }]: `etiqueta` es la ruta dentro de la carpeta elegida o soltada; si no
+    // viene, se usa la que trae el propio archivo del selector.
+    async function agregar(items) {
+      if (leyendo) { log("Espera a que termine de leerse la carpeta en curso.", "warn"); return; }
+
+      const lista = [];
+      for (const it of items) {
+        const f = it.f;
+        const etiqueta = it.etiqueta || f.webkitRelativePath || f.name;
+        if (/(^|\/)DICOMDIR$/i.test(etiqueta)) continue;      // el índice de la carpeta no es una imagen
+        const clave = etiqueta + "|" + f.size;
+        if (f.size === 0 || clavesVistas.has(clave)) continue;
+        clavesVistas.add(clave);
+        lista.push({ f, etiqueta });
+      }
+      if (lista.length === 0) { log("No venía ningún archivo nuevo en esa selección.", "info"); return; }
+
+      leyendo = true;
+      bloqueoCarpeta(true);
+      $("btnSend").disabled = $("btnRetryPending").disabled = true;
+      let leidos = 0, sinCabecera = 0, repetidas = 0;
+      setProgress("progArchivos", 0, "Leyendo cabeceras DICOM…", `0/${lista.length} archivos`);
+
+      for (let i = 0; i < lista.length; i += CONC_CABECERAS) {
+        const lote = lista.slice(i, i + CONC_CABECERAS);
+        const cabs = await Promise.all(lote.map(x =>
+          window.DicomCab ? DicomCab.leer(x.f) : Promise.resolve(null)));
+
+        for (let k = 0; k < lote.length; k++) {
+          const f = lote[k].f, etiqueta = lote[k].etiqueta, cab = cabs[k];
+
+          if (!cab || !cab.studyUid) {
+            sinCabecera++;
+            meter(filaDescartados(), f, etiqueta, "");
+            continue;
+          }
+          const sop = cab.studyUid + "|" + (cab.sopUid || etiqueta);
+          if (sopVistos.has(sop)) { repetidas++; continue; }   // la misma imagen, dos veces en la carpeta
+          sopVistos.add(sop);
+
+          let p = mapaPaquetes.get(cab.studyUid);
+          if (!p) p = nuevoPaquete(cab);
+          // Si el estudio ya está corregido a mano, las siguientes imágenes no lo vuelven a tapar.
+          if (!p.editado) {
+            if (!p.nombre && cab.nombre) p.nombre = cab.nombre;
+            if (!p.patientId && cab.patientId) p.patientId = cab.patientId;
+            if (!p.descripcion && cab.descripcion) p.descripcion = cab.descripcion;
+            if (!p.modalidad && cab.modalidad) p.modalidad = cab.modalidad;
+            if (!p.orig.nombre && cab.nombre) p.orig.nombre = cab.nombre;
+            if (!p.orig.patientId && cab.patientId) p.orig.patientId = cab.patientId;
+            if (!p.orig.descripcion && cab.descripcion) p.orig.descripcion = cab.descripcion;
+            if (!p.orig.modalidad && cab.modalidad) p.orig.modalidad = cab.modalidad;
+          }
+          meter(p, f, etiqueta, sop);
+        }
+
+        leidos += lote.length;
+        setProgress("progArchivos", leidos * 100 / lista.length, "Leyendo cabeceras DICOM…",
+          `${leidos}/${lista.length} archivos · ${paquetes.filter(p => !p.esDescarte).length} estudio(s)`);
+      }
+
+      hideProgress("progArchivos");
+      bloqueoCarpeta(false);
+      leyendo = false;
+      renderArchivos();
+
+      const nEstudios = paquetes.filter(p => !p.esDescarte).length;
+      let msg = `Leídos ${leidos} archivo(s) y armados ${nEstudios} estudio(s).`;
+      if (sinCabecera) msg += ` ${sinCabecera} no se leyeron como DICOM y quedaron fuera.`;
+      if (repetidas) msg += ` ${repetidas} imágenes repetidas se ignoraron.`;
+      log(msg, sinCabecera ? "warn" : "ok");
+    }
+
+    function totalImagenes() { return paquetes.reduce((s, p) => s + (p.esDescarte ? 0 : p.archivos.length), 0); }
+    function totalBytes() {
+      // Los descartados no se envían, así que no cuentan para el total de MB de la pantalla.
+      return paquetes.reduce((s, p) => s + (p.esDescarte ? 0 : p.bytes), 0);
+    }
+
+    function renderArchivos() {
+      const tb = $("tbodyArchivos");
+      const nEstudios = paquetes.filter(p => !p.esDescarte).length;
+      $("conteo").textContent =
+        `${nEstudios} estudio(s) · ${totalImagenes()} imágenes · ${mb(totalBytes())} MB`;
+      $("btnSend").disabled = nEstudios === 0 || !!envioCtl || leyendo;
+      $("btnRetryPending").disabled = nEstudios === 0 || !!envioCtl || leyendo;
+      if (paquetes.length === 0) {
+        tb.innerHTML = '<tr><td colspan="9" class="empty">Agrega una carpeta con estudios DICOM para empezar.</td></tr>';
+        return;
+      }
+      const ocupado = !!envioCtl || leyendo;
+      const filas = paquetes.slice(0, MAX_FILAS).map((p, i) => `
+        <tr data-i="${i}">
+          <td><input type="checkbox" class="chk" data-i="${i}" ${p.marcado ? "checked" : ""}
+            ${p.esDescarte ? "disabled" : ""} title="${p.esDescarte ? "No se envía" : "Marcar este estudio"}" /></td>
+          <td title="${escapeHtml(p.uid)}">${escapeHtml(p.nombre)}</td>
+          <td>${escapeHtml(p.patientId)}</td>
+          <td>${escapeHtml(p.descripcion)}</td>
+          <td>${escapeHtml(p.modalidad)}</td>
+          <td>${p.archivos.length}</td>
+          <td class="${estadoClase(p.estado)}">${escapeHtml(p.estado)}</td>
+          <td class="det">${escapeHtml(p.detalle)}</td>
+          <td>${p.esDescarte ? '<span class="hint">—</span>' : `
+            <button type="button" class="btn-editar${p.editado ? " editado" : ""}" data-edit="${i}"
+              ${ocupado ? "disabled" : ""}
+              title="${p.editado ? "Estudio con etiquetas corregidas: toca para ver o cambiar"
+                                 : "Corregir nombre, ID de paciente, modalidad o descripción antes de enviar"}"
+            >${p.editado ? "Editado" : "Editar"}</button>`}</td>
+        </tr>`).join("");
+      tb.innerHTML = filas + (paquetes.length > MAX_FILAS
+        ? `<tr><td colspan="9" class="empty">Mostrando ${MAX_FILAS} de ${paquetes.length}; se envían todos.</td></tr>`
+        : "");
+    }
+
+    // --------------------------------------------------------- agregar carpeta
+    // El botón es una `<label>` enlazada al `<input type=file>`: el navegador abre la ventana de
+    // carpetas por su cuenta, sin JavaScript. En varias PCs del parque el `.click()` desde script
+    // no abre nada (política del navegador o del equipo), que es exactamente el «no le deja subir
+    // archivos» que se veía al entrar por IP; la etiqueta nativa no depende de ese atajo.
+    // Variables de servicio: si el selector respondió (elige o cancela) no hace falta avisar de nada.
+    let respuestaSelector = false;
+    let focoPerdido = false;
+    addEventListener("blur", () => { focoPerdido = true; });
+
+    $("pickFolder").onchange = (e) => {
+      const files = Array.from(e.target.files || []);
+      e.target.value = "";
+      respuestaSelector = true;
+      agregar(files.map(f => ({ f })));
+    };
+
+    // Cuando el navegador sí abre la ventana, la página pierde el foco unos instantes. Si a los 2 s
+    // no pasó ninguna de las dos cosas, la ventana no se abrió: se dice en pantalla en vez de
+    // dejar el clic en silencio, y se ofrece el camino alterno (soltar la carpeta).
+    $("btnAddFolder").addEventListener("click", () => {
+      respuestaSelector = false;
+      focoPerdido = false;
+      setTimeout(() => {
+        if (respuestaSelector || focoPerdido) return;
+        const input = $("pickFolder");
+        const soporta = ("webkitdirectory" in input) || input.webkitdirectory === true;
+        log("El navegador no abrió la ventana de carpetas." +
+            (soporta ? "" : " Este navegador no permite elegir la carpeta entera.") +
+            " Suelta la carpeta con el ratón sobre la lista de estudios, que también la lee." +
+            (window.isSecureContext ? "" : " Además, estás entrando con http:// desde otra PC: " +
+             "varias versiones de Chrome y Edge solo dejan elegir carpetas en la dirección segura " +
+             "(https:// con el candado).") + " Si el problema sigue, avísame con esta captura.", "warn");
+      }, 2000);
+    });
+
+    // Aviso temprano si este navegador no puede elegir carpetas: mejor decirlo aquí que dejar
+    // el clic en silencio. La vía de la carpeta soltada sigue funcionando en esos casos.
+    (() => {
+      const input = $("pickFolder");
+      if (!input) return;
+      const soporta = ("webkitdirectory" in input) || input.webkitdirectory === true;
+      if (!soporta)
+        log("Este navegador no permite elegir la carpeta entera. Suelta la carpeta con los estudios " +
+            "sobre la lista de abajo, o usa Chrome o Edge.", "warn");
+    })();
+
+    // --------------------------------------------------------- soltar la carpeta
+    // Camino alterno y además el que funciona siempre: se arrastra la carpeta desde el Explorador
+    // y se suelta aquí. Se recorren las subcarpetas con la API de entradas de datos.
+    const zonaSoltar = $("tabArchivos");
+    zonaSoltar.addEventListener("dragenter", () => {
+      if (!leyendo && !envioCtl) zonaSoltar.classList.add("soltando");
+    });
+    zonaSoltar.addEventListener("dragover", (e) => {
+      if (leyendo || envioCtl) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      zonaSoltar.classList.add("soltando");
+    });
+    zonaSoltar.addEventListener("dragleave", (e) => {
+      if (!zonaSoltar.contains(e.relatedTarget)) zonaSoltar.classList.remove("soltando");
+    });
+    zonaSoltar.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      zonaSoltar.classList.remove("soltando");
+      if (leyendo) { log("Espera a que termine de leerse la carpeta en curso.", "warn"); return; }
+      if (envioCtl) { log("Espera a que termine el envío en curso.", "warn"); return; }
+
+      const dt = e.dataTransfer;
+      const items = Array.from((dt && dt.items) || []);
+      const lista = [];
+      const conEntradas = items.some(it => typeof it.webkitGetAsEntry === "function");
+
+      if (conEntradas) {
+        for (const it of items) {
+          const ent = it.webkitGetAsEntry();
+          if (ent) await recorrerEntrada(ent, ent.name, lista);
+          else { const f = it.getAsFile(); if (f) lista.push({ f, etiqueta: f.name }); }
+        }
+      } else {
+        for (const f of (dt && dt.files) || []) lista.push({ f, etiqueta: f.name });
+      }
+
+      if (lista.length === 0) { log("En lo que soltaste no venía ningún archivo.", "warn"); return; }
+      log(`Soltaste ${lista.length} archivo(s); leyendo cabeceras…`, "info");
+      await agregar(lista);
+    });
+
+    /** Baja por la carpeta soltada hasta sacar todos los archivos, con su ruta como etiqueta. */
+    async function recorrerEntrada(ent, ruta, salida) {
+      if (ent.isFile) {
+        const f = await new Promise(res => ent.file(res, () => res(null)));
+        if (f) salida.push({ f, etiqueta: ruta });
+        return;
+      }
+      if (!ent.isDirectory) return;
+      const lector = ent.createReader();
+      let lote;
+      do {
+        // readEntries entrega de 56 en 56: hay que pedir hasta que regrese vacío.
+        lote = await new Promise(res => lector.readEntries(res, () => res([])));
+        for (const h of lote) await recorrerEntrada(h, `${ruta}/${h.name}`, salida);
+      } while (lote.length);
+    }
+
+    $("btnClear").onclick = () => {
+      if (envioCtl || leyendo) return;
+      paquetes = []; mapaPaquetes = new Map(); clavesVistas = new Set(); sopVistos = new Set();
+      descartados = null;
+      hideProgress("progArchivos");
+      renderArchivos();
+    };
+    $("btnRemove").onclick = () => {
+      if (envioCtl || leyendo) return;
+      const marcados = paquetes.filter(p => p.marcado);
+      if (marcados.length === 0) { log("Marca en la tabla los estudios que quieras quitar.", "info"); return; }
+      for (const p of marcados) {
+        if (!p.esDescarte) mapaPaquetes.delete(p.uid);
+        else descartados = null;
+        quitarDeVistas(p);
+      }
+      paquetes = paquetes.filter(p => !p.marcado);
+      renderArchivos();
+      log(`Quitados de la lista ${marcados.length} renglón(es).`, "info");
+    };
+    $("tbodyArchivos").addEventListener("change", (e) => {
+      const i = e.target.dataset?.i;
+      if (i === undefined || !e.target.classList.contains("chk")) return;
+      paquetes[+i].marcado = e.target.checked;
+    });
+
+    // ------------------------------------------- editar etiquetas de un estudio
+
+    /*
+     * Cada renglón tiene su botón «Editar»: corrige nombre, ID de paciente, modalidad y
+     * descripción de ESE estudio antes de subirlo. La tabla siempre muestra lo que se va a
+     * enviar, así que lo que se escribe aquí se refleja en el renglón y viaja con la tanda como
+     * `ediciones` (JSON indexado por StudyInstanceUID). El servidor lo escribe en el dataset de
+     * cada imagen justo antes del C-STORE: el archivo del disco del usuario no se modifica.
+     *
+     * En DICOM el nombre es «APELLIDOS^NOMBRE» (componentes separados por circunflejo). En la
+     * pantalla se captura y se muestra «apellidos, nombre», que es como se lee en el visor del
+     * PACS; la coma se convierte ahí abajo, y si alguien escribe el circunflejo a mano se respeta.
+     */
+    function aDicomPN(v) {
+      const t = String(v || "").replace(/\s+/g, " ").trim();
+      if (!t || t.includes("^")) return t;
+      const i = t.indexOf(",");
+      if (i < 0) return t;
+      const apellidos = t.slice(0, i).trim();
+      const nombres = t.slice(i + 1).replace(/,/g, " ").replace(/\s+/g, " ").trim();
+      return nombres ? `${apellidos}^${nombres}` : apellidos;
+    }
+
+    let editando = null;        // renglón que se está corrigiendo
+
+    function abrirEditor(i) {
+      const p = paquetes[i];
+      if (!p || p.esDescarte) return;
+      if (envioCtl || leyendo) { log("Espera a que termine lo que está en curso.", "warn"); return; }
+
+      editando = p;
+      $("edQuien").textContent =
+        `${p.nombre} · ${p.patientId || "sin ID"} · ${p.modalidad || "sin modalidad"} · ` +
+        `${p.archivos.length} imagen(es) · estudio ${p.uid}`;
+      $("edImg").textContent = p.archivos.length;
+      $("edNombre").value = p.nombre === "(sin nombre)" ? "" : p.nombre;
+      $("edPaciente").value = p.patientId;
+      $("edModalidad").value = p.modalidad;
+      $("edDescripcion").value = p.descripcion;
+      $("edRestaurar").hidden = !p.editado;
+      $("mdlEditar").showModal();
+      $("edNombre").focus();
+    }
+
+    $("tbodyArchivos").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-edit]");
+      if (b) abrirEditor(+b.dataset.edit);
+    });
+
+    function cierraEditor() { $("mdlEditar").close(); editando = null; }
+
+    $("edCancelar").onclick = cierraEditor;
+    $("mdlEditar").addEventListener("cancel", () => { editando = null; });
+    // Clic fuera de la ventana (en el fondo oscuro): cierra sin cambiar nada.
+    $("mdlEditar").addEventListener("click", (e) => { if (e.target === $("mdlEditar")) cierraEditor(); });
+
+    $("edRestaurar").onclick = () => {
+      const p = editando;
+      if (!p) return;
+      p.editado = false;
+      p.edicion = null;
+      p.nombre = p.orig.nombre || "(sin nombre)";
+      p.patientId = p.orig.patientId;
+      p.descripcion = p.orig.descripcion;
+      p.modalidad = p.orig.modalidad;
+      p.detalle = "";
+      renderArchivos();
+      log(`Se quitaron las correcciones de «${p.nombre}»: se enviará tal como está en los archivos.`, "info");
+      cierraEditor();
+    };
+
+    $("frmEditar").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const p = editando;
+      if (!p) return;
+
+      const limpio = (id, mayus) => {
+        const v = $(id).value.replace(/\s+/g, " ").trim();
+        return mayus ? v.toUpperCase() : v;
+      };
+      const nombre = limpio("edNombre");
+      const paciente = limpio("edPaciente");
+      const modalidad = limpio("edModalidad", true);
+      const descripcion = limpio("edDescripcion");
+
+      // Campo vacío = «no lo toques»: se deja el valor que trae el archivo, que es lo que
+      // muestra el renglón. Borrar de verdad una etiqueta no es algo que se pueda mandar.
+      const nuevo = {
+        nombre: nombre || p.orig.nombre || "(sin nombre)",
+        patientId: paciente || p.orig.patientId,
+        modalidad: modalidad || p.orig.modalidad,
+        descripcion: descripcion || p.orig.descripcion
+      };
+
+      const cambio = {
+        nombre: nuevo.nombre !== (p.orig.nombre || "(sin nombre)") ? aDicomPN(nuevo.nombre) : "",
+        paciente: nuevo.patientId !== p.orig.patientId ? nuevo.patientId : "",
+        modalidad: nuevo.modalidad !== p.orig.modalidad ? nuevo.modalidad : "",
+        descripcion: nuevo.descripcion !== p.orig.descripcion ? nuevo.descripcion : ""
+      };
+      const hayCambio = Object.values(cambio).some(v => v);
+
+      Object.assign(p, nuevo);
+      p.editado = hayCambio;
+      p.edicion = hayCambio ? cambio : null;
+      p.detalle = hayCambio ? "Con etiquetas corregidas: se aplican al enviar." : "";
+
+      renderArchivos();
+      const que = Object.entries({
+        nombre: cambio.nombre, "ID paciente": cambio.paciente,
+        modalidad: cambio.modalidad, descripción: cambio.descripcion
+      }).filter(([, v]) => v).map(([k]) => k);
+      log(hayCambio
+        ? `Corregido «${p.nombre}» (${que.join(", ")}): se aplica a ${p.archivos.length} imagen(es) al enviar.`
+        : `Sin cambios en «${p.nombre}».`, hayCambio ? "ok" : "info");
+      cierraEditor();
+    });
+
+    // ------------------------------------------------------- envío por estudios
+
+    // Un estudio muy grande se sube en varias peticiones, sin rebasar el tope del servidor.
+    function tandasDe(p) {
+      const out = [];
+      let actual = [], bytes = 0;
+      for (const a of p.archivos) {
+        if (actual.length && (bytes + a.file.size > LOTE_MB * 1048576 || actual.length >= LOTE_ARCHIVOS)) {
+          out.push(actual); actual = []; bytes = 0;
+        }
+        actual.push(a); bytes += a.file.size;
+      }
+      if (actual.length) out.push(actual);
+      return out;
+    }
+
+    function pendienteDeEnviar(p) {
+      return !p.esDescarte &&
+        ["Pendiente", "Enviando", "Error", "Con errores", "Con avisos", "Cancelado"].includes(p.estado);
+    }
+
+    async function enviar(soloPendientes) {
+      const destino = $("destinoEnvio").value;
+      if (!destino) { log("Elige el nodo PACS destino en la lista.", "err"); return; }
+      if (leyendo) { log("Aún se están leyendo las cabeceras de la carpeta.", "warn"); return; }
+      if (soloPendientes) {
+        paquetes.forEach(p => { if (pendienteDeEnviar(p)) { p.estado = "Pendiente"; p.detalle = ""; } });
+      }
+
+      const trabajos = paquetes.filter(p => p.estado === "Pendiente");
+      if (trabajos.length === 0) { log("No hay estudios pendientes por enviar.", "info"); return; }
+
+      const totalImg = trabajos.reduce((s, p) => s + p.archivos.length, 0);
+      envioCtl = new AbortController();
+      $("btnSend").disabled = true;
+      $("btnRetryPending").disabled = true;
+      $("btnSendCancel").disabled = false;
+      bloqueoCarpeta(true);
+      let hechos = 0, okTot = 0, avisosTot = 0, errTot = 0;
+      log(`Enviando ${trabajos.length} estudio(s) — ${totalImg} imágenes — a ${destino} como ${cfg.emisor}…`, "info");
+      setProgress("progArchivos", 0, "Enviando…", `0/${totalImg} imágenes · destino ${destino}`);
+
+      for (const p of trabajos) {
+        if (envioCtl.signal.aborted) break;
+        p.estado = "Enviando";
+        p.detalle = "";
+        renderArchivos();
+        let ok = 0, avisos = 0, err = 0, primerError = "", editadas = 0;
+
+        for (const tanda of tandasDe(p)) {
+          const fd = new FormData();
+          fd.append("destino", destino);
+          fd.append("nombres", JSON.stringify(tanda.map(a => a.etiqueta)));
+          // Las correcciones de etiquetas viajan con cada tanda de este estudio.
+          if (p.edicion) fd.append("ediciones", JSON.stringify({ [p.uid]: p.edicion }));
+          for (const a of tanda) fd.append("archivos", a.file, a.file.name);
+
+          try {
+            const res = await fetch(`${API}/archivos`, { method: "POST", body: fd, signal: envioCtl.signal });
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(d.error || d.detail || res.statusText);
+            ok += d.guardadas || 0;
+            avisos += d.advertencias || 0;
+            err += d.errores || 0;
+            editadas += d.editadas || 0;
+            if (!primerError) {
+              const mala = (d.archivos || []).find(f => f && f.estado === "Error");
+              if (mala) primerError = mala.detalle || "El PACS rechazó la imagen.";
+            }
+          } catch (e) {
+            const abortado = e.name === "AbortError";
+            err += tanda.length;
+            primerError = primerError || (abortado ? "Se canceló a media subida." : e.message);
+            if (!abortado) log(`Fallo «${p.nombre}»: ` + e.message, "err");
+            hechos += tanda.length;
+            break;
+          }
+          hechos += tanda.length;
+          setProgress("progArchivos", hechos * 100 / totalImg, "Enviando…",
+            `${hechos}/${totalImg} imágenes · «${p.nombre}» ${Math.min(hechos, p.archivos.length)}/${p.archivos.length}`);
+        }
+
+        const subidas = ok + avisos;
+        if (err > 0 && subidas === 0) p.estado = "Error";
+        else if (err > 0) p.estado = "Con errores";
+        else if (avisos > 0) p.estado = "Con avisos";
+        else p.estado = "Subido";
+        p.detalle = `${subidas}/${p.archivos.length} imágenes en ${destino}` +
+          (avisos && err === 0 ? ` (${avisos} ya estaban en el PACS)` : "") +
+          (editadas ? ` · ${editadas} con etiquetas corregidas` : "") +
+          (err ? ` · ${err} sin subir${primerError ? ": " + primerError : ""}` : "");
+        okTot += ok; avisosTot += avisos; errTot += err;
+        renderArchivos();
+      }
+
+      const cancelado = envioCtl.signal.aborted;
+      paquetes.forEach(p => { if (p.estado === "Enviando") { p.estado = "Cancelado"; p.detalle = "No se envió."; } });
+      envioCtl = null;
+      $("btnSendCancel").disabled = true;
+      bloqueoCarpeta(false);
+      renderArchivos();
+
+      const resumen = `Subidos: ${paquetes.filter(p => p.estado === "Subido" || p.estado === "Con avisos").length} · ` +
+        `con errores: ${paquetes.filter(p => p.estado === "Error" || p.estado === "Con errores").length} · ` +
+        `pendientes: ${paquetes.filter(p => p.estado === "Pendiente" || p.estado === "Cancelado").length} · ` +
+        `imágenes: ${okTot + avisosTot} guardadas, ${errTot} sin subir`;
+      setProgress("progArchivos", cancelado ? null : 100,
+        cancelado ? "Envío cancelado" : "Envío terminado", resumen);
+      log(resumen, cancelado ? "warn" : (errTot ? "warn" : "ok"));
+    }
+
+    $("btnSend").onclick = () => enviar(false);
+    $("btnRetryPending").onclick = () => enviar(true);
+    $("btnSendCancel").onclick = () => {
+      if (!envioCtl) return;
+      log("Cancelando: se corta el estudio en curso…", "warn");
+      $("btnSendCancel").disabled = true;
+      envioCtl.abort();
+    };
+
+    // ------------------------------------------------------------------- reenvío
+
+    function toDicomDate(iso) { return iso ? iso.replace(/-/g, "") : ""; }
+    function hoy() { return new Date().toISOString().slice(0, 10); }
+
+    function fechas(dias) {
+      const to = new Date();
+      const from = new Date(to.getTime() - (dias - 1) * 86400000);
+      $("dateFrom").value = from.toISOString().slice(0, 10);
+      $("dateTo").value = to.toISOString().slice(0, 10);
+    }
+    $("btnHoy").onclick = () => fechas(1);
+    $("btn7").onclick = () => fechas(7);
+    $("btnLimpiar").onclick = () => {
+      ["patientId", "patientName", "modality", "accession", "dateFrom", "dateTo"].forEach(i => $(i).value = "");
+    };
+
+    function renderEstudios() {
+      const tb = $("tbodyEstudios");
+      $("countTotal").textContent = estudios.length;
+      $("countSelected").textContent = estudios.filter(s => s.seleccionado).length;
+      $("btnReenviar").disabled = estudios.filter(s => s.seleccionado).length === 0 || !!jobId;
+      if (estudios.length === 0) {
+        tb.innerHTML = '<tr><td colspan="10" class="empty">Busca estudios en el nodo de origen para poder reenviarlos.</td></tr>';
+        return;
+      }
+      const filas = estudios.slice(0, MAX_FILAS).map((s, i) => `
+        <tr class="${s.seleccionado ? "selected" : ""}" data-i="${i}">
+          <td><input type="checkbox" class="chk" data-i="${i}" ${s.seleccionado ? "checked" : ""} /></td>
+          <td>${escapeHtml(s.patientName)}</td>
+          <td>${escapeHtml(s.patientId)}</td>
+          <td>${escapeHtml(s.fechaBonita)}</td>
+          <td>${escapeHtml(s.studyDescription)}</td>
+          <td>${escapeHtml(s.modalitiesInStudy)}</td>
+          <td>${escapeHtml(s.numberOfInstances)}</td>
+          <td>${escapeHtml(s.sourceName || s.sourceAeTitle)}</td>
+          <td class="${estadoClase(s.estado)}">${escapeHtml(s.estado)}</td>
+          <td class="det">${escapeHtml(s.detalle)}</td>
+        </tr>`).join("");
+      tb.innerHTML = filas + (estudios.length > MAX_FILAS
+        ? `<tr><td colspan="10" class="empty">Mostrando ${MAX_FILAS} de ${estudios.length}. Con «Seleccionar todos» se marca toda la lista.</td></tr>`
+        : "");
+    }
+
+    async function buscar() {
+      const origenes = elegidos($("origenReenvio"));
+      if (origenes.length === 0) { log("Marca de qué nodo PACS quieres traer los estudios.", "err"); return; }
+
+      const pid = $("patientId").value.trim();
+      const pname = $("patientName").value.trim();
+      const mod = $("modality").value.trim();
+      const acc = $("accession").value.trim();
+      const f = toDicomDate($("dateFrom").value), t = toDicomDate($("dateTo").value);
+
+      // Sin ningún criterio no se consulta: el PACS devolvería miles de estudios.
+      if (!pid && !pname && !mod && !acc && !f && !t) {
+        log("Escribe al menos un criterio (ID, nombre, fecha o modalidad) antes de buscar.", "err");
+        return;
+      }
+
+      const p = new URLSearchParams();
+      if (pid) p.set("patientId", pid);
+      if (pname) p.set("patientName", pname);
+      if (mod) p.set("modalitiesInStudy", mod);
+      if (acc) p.set("accessionNumber", acc);
+      if (f && t) p.set("studyDate", `${f}-${t}`);
+      else if (f) p.set("studyDate", f);
+      else if (t) p.set("studyDate", t);
+      p.set("aeTitles", origenes.join(","));
+
+      $("btnBuscar").disabled = true;
+      log(`Buscando en ${origenes.join(", ")} con el AE ${cfg.consultor}…`, "info");
+      try {
+        const res = await fetch("/api/dicom/studies?" + p.toString());
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || data.detail || res.statusText);
+        estudios = (Array.isArray(data) ? data : []).map(s => ({
+          patientName: s.patientName || "",
+          patientId: s.patientId || "",
+          studyDate: s.studyDate || "",
+          fechaBonita: (s.studyDate || "").length === 8
+            ? `${s.studyDate.slice(0, 4)}-${s.studyDate.slice(4, 6)}-${s.studyDate.slice(6, 8)}` : (s.studyDate || ""),
+          studyDescription: s.studyDescription || "",
+          modalitiesInStudy: s.modalitiesInStudy || "",
+          numberOfInstances: s.numberOfInstances || "",
+          studyInstanceUid: s.studyInstanceUid || "",
+          sourceAeTitle: s.sourceAeTitle || "",
+          sourceName: s.sourceName || "",
+          seleccionado: false,
+          estado: "",
+          detalle: ""
+        }));
+        log(`Búsqueda terminada: ${estudios.length} estudio(s).`, "ok");
+      } catch (e) {
+        log("Error en la búsqueda: " + e.message, "err");
+        estudios = [];
+      } finally {
+        $("btnBuscar").disabled = false;
+        renderEstudios();
+      }
+    }
+    $("btnBuscar").onclick = buscar;
+    $("btnSelTodos").onclick = () => { estudios.forEach(s => s.seleccionado = true); renderEstudios(); };
+    $("btnSelNinguno").onclick = () => { estudios.forEach(s => s.seleccionado = false); renderEstudios(); };
+    $("tbodyEstudios").addEventListener("click", (e) => {
+      const tr = e.target.closest("tr[data-i]");
+      if (!tr) return;
+      const i = +tr.dataset.i;
+      estudios[i].seleccionado = e.target.classList.contains("chk") ? e.target.checked : !estudios[i].seleccionado;
+      renderEstudios();
+    });
+
+    async function reenviar() {
+      const destinos = elegidos($("destinoReenvio"));
+      if (destinos.length === 0) { log("Elige en la lista el nodo destino al que se envía.", "err"); return; }
+      const marcados = estudios.filter(s => s.seleccionado);
+      if (marcados.length === 0) { log("Marca al menos un estudio de los resultados.", "err"); return; }
+
+      marcados.forEach(s => { s.estado = "En cola"; s.detalle = ""; });
+      renderEstudios();
+
+      $("btnReenviar").disabled = true;
+      $("btnReenviarCancel").disabled = false;
+      setProgress("progReenvio", 0, "Reenviando…", `0/${marcados.length} estudios`);
+      log(`Traiendo ${marcados.length} estudio(s) y enviando a ${destinos.join(", ")}…`, "info");
+
+      try {
+        const res = await fetch(`${API}/reenviar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: marcados.map(s => ({
+              studyInstanceUid: s.studyInstanceUid,
+              aeTitle: s.sourceAeTitle,
+              expectedInstances: parseInt(s.numberOfInstances, 10) || null
+            })),
+            destinos
+          })
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(d.error || d.detail || res.statusText);
+        jobId = d.jobId;
+        esperar(d.jobId, marcados);
+      } catch (e) {
+        log("No se pudo iniciar el reenvío: " + e.message, "err");
+        setProgress("progReenvio", 0, "Error", e.message);
+        marcados.forEach(s => { s.estado = "Error"; s.detalle = e.message; });
+        renderEstudios();
+        terminarReenvio();
+      }
+    }
+    $("btnReenviar").onclick = reenviar;
+
+    $("btnReenviarCancel").onclick = async () => {
+      if (!jobId) return;
+      $("btnReenviarCancel").disabled = true;
+      try {
+        const res = await fetch(`${API}/reenviar/${jobId}/cancelar`, { method: "POST" });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          throw new Error(d.error || res.statusText);
+        }
+        log("Cancelación pedida al servidor: ya no se traen los estudios que faltaban.", "warn");
+      } catch (e) {
+        log("No se pudo cancelar: " + e.message, "err");
+        $("btnReenviarCancel").disabled = false;
+      }
+    };
+
+    function terminarReenvio() {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      jobId = null;
+      $("btnReenviarCancel").disabled = true;
+      renderEstudios();
+    }
+
+    function esperar(id, marcados) {
+      let vistos = 0;
+      const tick = async () => {
+        try {
+          const res = await fetch(`${API}/reenviar/${id}/progreso`);
+          if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+          const p = await res.json();
+
+          // Estados por estudio (el servidor los manda indexados por UID).
+          let cambio = false;
+          for (const s of marcados) {
+            const e = p.estados && p.estados[s.studyInstanceUid];
+            if (e && (s.estado !== e[0] || s.detalle !== e[1])) { s.estado = e[0]; s.detalle = e[1]; cambio = true; }
+          }
+          if (cambio) renderEstudios();
+
+          const msgs = p.mensajes || [];
+          for (let i = vistos; i < msgs.length; i++) log(msgs[i], /error/i.test(msgs[i]) ? "err" : "info");
+          vistos = msgs.length;
+
+          setProgress("progReenvio", p.porcentaje || 0,
+            p.estado === "running" ? "Traiendo y reenviando…" : (p.estado || ""),
+            `${p.estudiosHechos}/${p.estudiosTotal} estudios · ${p.imagenesDescargadas} descargadas · ${p.imagenesEnviadas} enviadas`);
+
+          if (["completed", "completed_con_errores", "failed", "cancelled"].includes(p.estado)) {
+            if (p.estado === "failed") log("El reenvío falló: " + (p.error || "sin detalle"), "err");
+            else if (p.estado === "cancelled") log("Reenvío cancelado.", "warn");
+            else if (p.estado === "completed_con_errores")
+              log(`Reenvío terminado con ${p.errores} estudio(s) con errores; sus archivos temporales se conservaron.`, "warn");
+            else log(`Reenvío completo: ${p.estudiosHechos}/${p.estudiosTotal} estudios, ${p.imagenesEnviadas} imágenes enviadas.`, "ok");
+            terminarReenvio();
+          }
+        } catch (e) {
+          log("Se perdió el rastro del reenvío: " + e.message, "err");
+          terminarReenvio();
+        }
+      };
+      tick();
+      pollTimer = setInterval(tick, 700);
+    }
+
+    // Enter en los criterios de búsqueda del reenvío = buscar. En la pestaña de archivos no se
+    // asocia a nada, para no consultar el PACS mientras se arma la lista de subida.
+    document.querySelectorAll("#tabReenvio input").forEach(inp => {
+      inp.addEventListener("keydown", (e) => { if (e.key === "Enter") buscar(); });
+    });
+
+    fechas(1);
+    cargar();
+  </script>
+<script src="/js/ubicacion.js"></script>
+</body>
+</html>

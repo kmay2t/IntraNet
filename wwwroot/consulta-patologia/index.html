@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Consulta</title>
+  <link rel="stylesheet" href="/consulta-patologia/estilos.css?v=20261125b">
+</head>
+<body>
+  <a class="skip-link" href="#contenido">Saltar al contenido</a>
+
+  <header class="site-header">
+    <a class="brand" href="/consulta" aria-label="Consulta">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none">
+          <path d="M8 4h8l4 4h8v20H8V4Z" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M12 12h8M12 17h8M12 22h5" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="24" cy="7" r="2" fill="currentColor"/>
+        </svg>
+      </span>
+      <span class="brand-text">Meditechnosys<small>Medical Technology Solutions</small></span>
+    </a>
+    <div class="access-badge">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.7"/>
+        <path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.7"/>
+      </svg>
+      Acceso sin cuenta
+    </div>
+  </header>
+
+  <main id="contenido" class="page">
+    <section class="page-heading" aria-labelledby="titulo-principal">
+      <div>
+        <p class="eyebrow">Patología</p>
+        <h1 id="titulo-principal">Consulta</h1>
+        <p class="lead">Busca un reporte por folio, NSS, nombre o agregado y consulta su PDF sin modificar el registro.</p>
+      </div>
+      <span class="readonly-badge">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 12.5 9 17l11-11" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        Solo lectura
+      </span>
+    </section>
+
+    <aside class="notice" aria-label="Aviso de confidencialidad">
+      <span class="notice-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M12 3 4.5 6v5.5c0 4.6 3.1 7.8 7.5 9.5 4.4-1.7 7.5-4.9 7.5-9.5V6L12 3Z" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M12 8v4.5M12 16h.01" stroke="currentColor" stroke-width="1.8"/>
+        </svg>
+      </span>
+      <div>
+        <strong>Consulta independiente, sin usuario ni contraseña.</strong>
+        <p>Esta pantalla no permite subir, editar ni eliminar reportes. La información es confidencial: úsala únicamente dentro de la red institucional y no la compartas fuera de ella.</p>
+      </div>
+    </aside>
+
+    <section class="panel search-panel" aria-labelledby="titulo-busqueda">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Repositorio</p>
+          <h2 id="titulo-busqueda">Buscar reportes</h2>
+        </div>
+        <span id="area-nombre" class="area-label">Patología Especialidades</span>
+      </div>
+
+      <form id="form-busqueda" class="search-form" autocomplete="off">
+        <label class="field">
+          <span>Área</span>
+          <select id="f-area" name="area">
+            <option value="esp">Patología Especialidades</option>
+            <option value="gineco">Patología Ginecología</option>
+          </select>
+        </label>
+
+        <label class="field field-search">
+          <span>Folio, NSS, nombre o agregado</span>
+          <span class="input-with-icon">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="1.7"/>
+              <path d="m15.5 15.5 4.5 4.5" stroke="currentColor" stroke-width="1.7"/>
+            </svg>
+            <input id="f-q" name="q" type="search" maxlength="120" placeholder="Escribe para buscar…">
+          </span>
+        </label>
+
+        <label class="field">
+          <span>Tipo de estudio</span>
+          <select id="f-modalidad" name="modalidad">
+            <option value="">Todos</option>
+            <option value="Biopsia">Biopsia</option>
+            <option value="Transoperatorio">Transoperatorio</option>
+            <option value="Quirúrgico">Quirúrgico</option>
+            <option value="Revisión de laminillas">Revisión de laminillas</option>
+            <option value="Citología">Citología</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Estudio</span>
+          <input id="f-estudio" name="estudio" type="text" list="f-estudios-lista" maxlength="255" placeholder="Escribe una palabra clave…" autocomplete="off">
+          <datalist id="f-estudios-lista"></datalist>
+        </label>
+
+        <label class="field">
+          <span>Desde</span>
+          <input id="f-desde" name="desde" type="date">
+        </label>
+
+        <label class="field">
+          <span>Hasta</span>
+          <input id="f-hasta" name="hasta" type="date">
+        </label>
+
+        <button id="btn-buscar" class="button button-primary" type="submit">Buscar</button>
+        <button id="btn-limpiar" class="button button-secondary" type="button">Limpiar</button>
+      </form>
+
+      <div id="feedback" class="feedback" role="alert" hidden>
+        <span id="feedback-texto"></span>
+        <button id="btn-reintentar" class="button button-secondary button-small" type="button" hidden>Reintentar</button>
+      </div>
+    </section>
+
+    <section class="panel results-panel" aria-labelledby="titulo-resultados">
+      <div class="results-heading">
+        <div>
+          <p class="eyebrow">Listado</p>
+          <h2 id="titulo-resultados">Resultados</h2>
+        </div>
+        <p id="resumen" class="summary" role="status" aria-live="polite">Cargando reportes…</p>
+      </div>
+
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Tabla de reportes de patología">
+        <table id="tabla-resultados" aria-busy="true">
+          <thead>
+            <tr>
+              <th scope="col">Folio</th>
+              <th scope="col">Fecha</th>
+              <th scope="col">Paciente</th>
+              <th scope="col">NSS</th>
+              <th scope="col">Agregado</th>
+              <th scope="col">Tipo de estudio</th>
+              <th scope="col">Estudio</th>
+              <th scope="col">Documento</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-resultados">
+            <tr><td class="table-message" colspan="8">Cargando reportes…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <nav class="pagination" aria-label="Paginación de resultados">
+        <button id="btn-anterior" class="button button-secondary" type="button" disabled>Anterior</button>
+        <span id="pagina-texto" aria-live="polite">Página 1 de 1</span>
+        <button id="btn-siguiente" class="button button-secondary" type="button" disabled>Siguiente</button>
+      </nav>
+    </section>
+
+    <footer class="page-footer">
+      <span>Consulta · Solo lectura</span>
+      <span>No solicita login · No permite modificaciones</span>
+    </footer>
+  </main>
+
+  <div id="visor" class="viewer" role="dialog" aria-modal="true" aria-labelledby="visor-titulo" hidden>
+    <div class="viewer-panel">
+      <header class="viewer-header">
+        <div class="viewer-heading">
+          <span class="eyebrow">Vista previa</span>
+          <h2 id="visor-titulo">Reporte PDF</h2>
+          <p id="visor-meta" class="viewer-meta"></p>
+        </div>
+        <div class="viewer-actions">
+          <a id="visor-abrir" class="button button-secondary button-small" href="#" target="_blank" rel="noopener">Abrir en pestaña</a>
+          <a id="visor-descargar" class="button button-secondary button-small" href="#" download>Descargar</a>
+          <button id="visor-cerrar" class="button button-icon" type="button" aria-label="Cerrar visor">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8"/>
+            </svg>
+          </button>
+        </div>
+      </header>
+      <div class="viewer-body">
+        <iframe id="visor-frame" title="Vista previa del reporte PDF"></iframe>
+        <div id="visor-cargando" class="viewer-state" role="status">
+          <span class="spinner" aria-hidden="true"></span>
+          <strong>Cargando el reporte…</strong>
+          <span>Esto puede tardar unos segundos.</span>
+        </div>
+        <div id="visor-error" class="viewer-state viewer-error" role="alert" hidden>
+          <strong>No se pudo mostrar el PDF</strong>
+          <span id="visor-error-texto"></span>
+          <div class="viewer-error-actions">
+            <button id="visor-reintentar" class="button button-secondary button-small" type="button">Reintentar</button>
+            <a id="visor-error-abrir" class="button button-secondary button-small" href="#" target="_blank" rel="noopener">Abrir en pestaña</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <noscript>
+    <div class="noscript">Para consultar los reportes es necesario habilitar JavaScript en el navegador.</div>
+  </noscript>
+
+  <script src="/consulta-patologia/app.js?v=20261125d"></script>
+</body>
+</html>

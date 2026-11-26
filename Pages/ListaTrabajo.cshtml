@@ -1,0 +1,303 @@
+@page "/dicom/lista-trabajo"
+@model Meditechnosys.Intranet.Pages.ListaTrabajoModel
+@{
+    Layout = "_LayoutPanel";
+    ViewData["Title"] = "Consulta lista de trabajo";
+}
+@section Styles {
+    <link rel="stylesheet" href="/css/hoja-fecha.css?v=20261104c" />
+    <link rel="stylesheet" href="~/css/lista-trabajo.css" asp-append-version="true" />
+}
+
+<main class="lista-trabajo" id="lista-trabajo">
+    @Html.AntiForgeryToken()
+    @* El título va subrayado en dorado, como el de las tarjetas de las demás pantallas.
+       El «Volver al inicio» y el rótulo «Sistemas médicos» se quitaron: arriba, en la barra
+       negra, ya están Regresar y Home.
+       Es un <div>, no un <header>: `panel.css` pinta toda etiqueta <header> como la barra negra
+       fija, y esa solo debe ser la de la cabecera de la página. *@
+    <div class="lt-heading">
+        <h1>Consulta lista de trabajo</h1>
+        <p class="lt-note">Consulta MWL de procedimientos programados y filtra por nombre, ID, número de acceso, fecha, hora, modalidad y procedimiento.</p>
+    </div>
+
+    <noscript><p class="lt-message" data-kind="error">Activa JavaScript para consultar la lista de trabajo y realizar las pruebas técnicas.</p></noscript>
+    <p id="lt-options-status" class="lt-note" role="status">Comprobando permiso de envío…</p>
+
+    <section class="lt-panel" aria-labelledby="lt-mwl-title">
+        <div class="lt-panel-heading">
+            <h2 id="lt-mwl-title">Conexión del nodo</h2>
+            <span class="lt-tag">C-FIND MWL · C-ECHO · C-STORE</span>
+        </div>
+        <p class="lt-note" id="lt-mwl-help">Esta es la <strong>única conexión</strong> de la pantalla: con estos mismos datos se consulta la lista de trabajo, se hace el Ping y se envía la imagen de prueba. El servidor debe ofrecer una lista de trabajo (MWL) y aceptar este AE Title.</p>
+        <form id="lt-query-form" method="post" asp-antiforgery="false" autocomplete="off" novalidate aria-describedby="lt-mwl-help">
+            <div class="lt-field">
+                <label for="lt-ae-local">AE local</label>
+                <input id="lt-ae-local" value="MEDI" maxlength="16" required spellcheck="false" autocapitalize="off" aria-describedby="lt-local-help lt-ae-local-error" />
+                <small id="lt-local-help">Máximo 16 caracteres. Es el AE con el que esta intranet se presenta al nodo, al consultar y al enviar.</small>
+                <span id="lt-ae-local-error" class="lt-field-error" hidden></span>
+            </div>
+            <div class="lt-grid lt-grid-connection">
+                <div class="lt-field">
+                    <label for="lt-mwl-host">Host / IP del nodo</label>
+                    <input id="lt-mwl-host" value="" maxlength="253" required spellcheck="false" autocapitalize="off" placeholder="Host o dirección IP" aria-describedby="lt-mwl-host-error" />
+                    <span id="lt-mwl-host-error" class="lt-field-error" hidden></span>
+                </div>
+                <div class="lt-field">
+                    <label for="lt-mwl-port">Puerto</label>
+                    <input id="lt-mwl-port" type="number" value="104" min="1" max="65535" step="1" required inputmode="numeric" aria-describedby="lt-mwl-port-error" />
+                    <span id="lt-mwl-port-error" class="lt-field-error" hidden></span>
+                </div>
+                <div class="lt-field">
+                    <label for="lt-mwl-ae">AE remoto</label>
+                    <input id="lt-mwl-ae" value="" maxlength="16" required spellcheck="false" autocapitalize="off" aria-describedby="lt-mwl-ae-error" />
+                    <span id="lt-mwl-ae-error" class="lt-field-error" hidden></span>
+                </div>
+            </div>
+            <div class="lt-actions">
+                <button id="lt-mwl-ping" class="lt-button" type="button" disabled>Ping</button>
+                <output id="lt-mwl-ping-status" class="lt-ping" role="status" aria-live="polite" aria-label="Resultado del Ping MWL"></output>
+            </div>
+            <p id="lt-mwl-error" class="lt-message" data-kind="error" role="alert" hidden></p>
+            <fieldset class="lt-fieldset lt-filters" aria-describedby="lt-filters-help">
+                <legend class="lt-fieldset-title">Filtros de las entradas programadas</legend>
+                <p class="lt-note" id="lt-filters-help">Modalidad y fechas se piden al nodo; nombre, ID, número de acceso, hora y procedimiento filtran además lo ya recibido.</p>
+                <div class="lt-grid lt-grid-filters">
+                    <div class="lt-field">
+                        <label for="lt-f-nombre">Nombre</label>
+                        <input id="lt-f-nombre" maxlength="200" placeholder="Apellido y nombre" spellcheck="false" autocapitalize="off" aria-describedby="lt-f-nombre-error" />
+                        <span id="lt-f-nombre-error" class="lt-field-error" hidden></span>
+                    </div>
+                    <div class="lt-field">
+                        <label for="lt-f-id">ID del paciente</label>
+                        <input id="lt-f-id" maxlength="64" placeholder="Pulse, NSS o ID" spellcheck="false" autocapitalize="off" aria-describedby="lt-f-id-error" />
+                        <span id="lt-f-id-error" class="lt-field-error" hidden></span>
+                    </div>
+                    <div class="lt-field">
+                        <label for="lt-f-acceso">Número de acceso</label>
+                        <input id="lt-f-acceso" maxlength="16" placeholder="Acceso del estudio" spellcheck="false" autocapitalize="off" aria-describedby="lt-f-acceso-help lt-f-acceso-error" />
+                        <small id="lt-f-acceso-help">Busca dentro de lo que devolvió el nodo; hasta 16 caracteres.</small>
+                        <span id="lt-f-acceso-error" class="lt-field-error" hidden></span>
+                    </div>
+                    <div class="lt-field">
+                        <label for="lt-f-desde">Fecha desde</label>
+                        <input id="lt-f-desde" type="date" max="2100-12-31" aria-describedby="lt-f-desde-help lt-f-desde-error" />
+                        <small id="lt-f-desde-help">Con la hoja de calendario: Día, Mes, Año o Rango.</small>
+                        <span id="lt-f-desde-error" class="lt-field-error" hidden></span>
+                    </div>
+                    <div class="lt-field">
+                        <label for="lt-f-hasta">Fecha hasta</label>
+                        <input id="lt-f-hasta" type="date" max="2100-12-31" aria-describedby="lt-f-hasta-error" />
+                        <span id="lt-f-hasta-error" class="lt-field-error" hidden></span>
+                    </div>
+                    <div class="lt-field">
+                        <label for="lt-f-hora-desde">Hora</label>
+                        <input id="lt-f-hora-desde" type="text" value="" maxlength="5" hidden tabindex="-1" aria-hidden="true" autocomplete="off" />
+                        <input id="lt-f-hora-hasta" type="text" value="" maxlength="5" hidden tabindex="-1" aria-hidden="true" autocomplete="off" />
+                        <span id="lt-f-hora-desde-error" class="lt-field-error" hidden></span>
+                        <span id="lt-f-hora-hasta-error" class="lt-field-error" hidden></span>
+                    </div>
+                    <div class="lt-field">
+                        <label for="lt-modality">Modalidad</label>
+                        <input id="lt-modality" list="lt-modalities" maxlength="16" pattern="[A-Z0-9_ ]{0,16}" placeholder="Todas las modalidades" spellcheck="false" autocapitalize="characters" aria-describedby="lt-modality-help lt-modality-error" />
+                        <datalist id="lt-modalities">
+                            <option value="CT"></option>
+                            <option value="MR"></option>
+                            <option value="US"></option>
+                            <option value="CR"></option>
+                            <option value="DX"></option>
+                            <option value="MG"></option>
+                            <option value="NM"></option>
+                            <option value="PT"></option>
+                            <option value="XA"></option>
+                            <option value="RF"></option>
+                            <option value="OT"></option>
+                        </datalist>
+                        <small id="lt-modality-help">Vacío = todas. Admite otro código DICOM en mayúsculas, de hasta 16 caracteres.</small>
+                        <span id="lt-modality-error" class="lt-field-error" hidden></span>
+                    </div>
+                    <div class="lt-field">
+                        <label for="lt-f-procedimiento">Procedimiento</label>
+                        <input id="lt-f-procedimiento" maxlength="200" placeholder="Descripción del estudio" spellcheck="false" autocapitalize="off" aria-describedby="lt-f-procedimiento-error" />
+                        <span id="lt-f-procedimiento-error" class="lt-field-error" hidden></span>
+                    </div>
+                </div>
+                <div class="lt-actions lt-filter-actions">
+                    <button id="lt-clear-filters" class="lt-button" type="button">Limpiar filtros</button>
+                    <p id="lt-filter-status" class="lt-note" role="status" aria-live="polite"></p>
+                </div>
+            </fieldset>
+
+            <div class="lt-query-bar">
+                <p class="lt-note">Con los filtros puestos, Consultar vuelve al nodo con la modalidad y el periodo elegidos.</p>
+                <div class="lt-actions">
+                    <button id="lt-query" class="lt-button lt-primary" type="submit" disabled>Consultar</button>
+                    <button id="lt-cancel-query" class="lt-button" type="button" disabled>Cancelar</button>
+                </div>
+            </div>
+        </form>
+    </section>
+
+    <section class="lt-panel" aria-labelledby="lt-results-title">
+        <div class="lt-panel-heading">
+            <h2 id="lt-results-title">Entradas programadas</h2>
+            <span class="lt-tag">Solo SCHEDULED</span>
+        </div>
+        <p id="lt-results-status" class="lt-message" role="status" aria-live="polite">Configura el nodo MWL y pulsa Consultar.</p>
+        <p id="lt-missing-status" class="lt-message" data-kind="warning" role="status" hidden></p>
+        <p id="lt-not-scheduled" class="lt-note" hidden></p>
+        <p id="lt-limited" class="lt-message" data-kind="warning" role="status" hidden></p>
+        <div id="lt-results" hidden>
+            <div id="lt-table-scroll" class="lt-table-scroll" tabindex="0" role="region" aria-label="Resultados de lista de trabajo; tabla desplazable">
+                <table class="lt-table">
+                    <caption>Procedimientos programados recibidos del nodo MWL · 50 filas por página · marca una entrada para enviarle la prueba</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col"><span class="lt-sr-only">Elegir entrada</span></th>
+                            <th scope="col">Fecha / hora</th>
+                            <th scope="col">Paciente</th>
+                            <th scope="col">ID</th>
+                            <th scope="col">Acceso</th>
+                            <th scope="col">Modalidad</th>
+                            <th scope="col">Procedimiento</th>
+                            <th scope="col">Estación</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lt-rows"></tbody>
+                </table>
+            </div>
+            <nav class="lt-pagination" aria-label="Paginación de resultados">
+                <p id="lt-page-status" class="lt-note" role="status"></p>
+                <div class="lt-actions">
+                    <button id="lt-prev" class="lt-button" type="button" disabled>Anterior</button>
+                    <button id="lt-next" class="lt-button" type="button" disabled>Siguiente</button>
+                </div>
+            </nav>
+        </div>
+    </section>
+
+    <section class="lt-panel" aria-labelledby="lt-test-title">
+        <div class="lt-panel-heading">
+            <h2 id="lt-test-title">Prueba técnica de envío</h2>
+            <span class="lt-tag">C-STORE · verificación Study Root</span>
+        </div>
+        <div class="lt-test-grid">
+            <figure class="lt-preview">
+                <div class="lt-image-frame">
+                    <img id="lt-pattern" src="/api/dicom/worklist/patron" alt="Patrón técnico sintético: círculo de contraste con anillos concéntricos grises" width="256" height="256" />
+                </div>
+                <figcaption>Círculo de contraste · Prueba técnica, no diagnóstica</figcaption>
+                <p id="lt-pattern-error" class="lt-message" data-kind="warning" role="status" hidden>No se pudo cargar el patrón. Comprueba tu sesión y el servicio de imagen.</p>
+            </figure>
+            <div class="lt-test-controls">
+                <p class="lt-note" id="lt-destino-help">La imagen se envía al nodo escrito arriba: es la misma conexión de la consulta y del Ping, no hay un destino aparte para Storage.</p>
+                <p class="lt-note" id="lt-destino" role="status" aria-live="polite">Destino: todavía no hay una conexión válida escrita arriba.</p>
+                <form id="lt-test-form" method="post" asp-antiforgery="false" autocomplete="off" novalidate aria-describedby="lt-destino-help lt-destino">
+                    <fieldset id="lt-source-fields" class="lt-fieldset" aria-describedby="lt-source-help">
+                        <legend class="lt-fieldset-title">Datos del estudio de prueba</legend>
+                        <p class="lt-note" id="lt-source-help">La imagen siempre es el círculo sintético. Con una entrada de la lista eliges, casilla por casilla, qué datos de esa entrada regresan dentro de la prueba; vienen marcados todos por defecto. El UID del estudio programado viaja con la casilla «UID del estudio» para que el destino no abra un segundo registro; la serie y la imagen son siempre nuevas.</p>
+                        <div class="lt-radios">
+                            <label class="lt-radio">
+                                <input type="radio" name="lt-origen" value="anonima" checked />
+                                <span>Sin datos de paciente (PRUEBA^CIRCULO)</span>
+                            </label>
+                            <label class="lt-radio">
+                                <input type="radio" name="lt-origen" value="seleccion" id="lt-origen-seleccion" disabled />
+                                <span>Entrada seleccionada de la lista</span>
+                            </label>
+                            <p class="lt-note" id="lt-selected-summary">Ninguna entrada seleccionada. Marca la casilla de una fila de la lista para enviarle la prueba.</p>
+                            <label class="lt-radio">
+                                <input type="radio" name="lt-origen" value="manual" />
+                                <span>Datos de un paciente escritos a mano</span>
+                            </label>
+                        </div>
+                        <div id="lt-manual-fields" class="lt-grid lt-grid-two" hidden>
+                            <div class="lt-field">
+                                <label for="lt-m-nombre">Nombre del paciente</label>
+                                <input id="lt-m-nombre" maxlength="200" spellcheck="false" autocapitalize="off" placeholder="Apellido^Nombre" aria-describedby="lt-m-nombre-help lt-m-nombre-error" />
+                                <small id="lt-m-nombre-help">Como lo recibe el PACS; el separador de componentes es ^.</small>
+                                <span id="lt-m-nombre-error" class="lt-field-error" hidden></span>
+                            </div>
+                            <div class="lt-field">
+                                <label for="lt-m-id">ID del paciente</label>
+                                <input id="lt-m-id" maxlength="64" spellcheck="false" autocapitalize="off" aria-describedby="lt-m-id-error" />
+                                <span id="lt-m-id-error" class="lt-field-error" hidden></span>
+                            </div>
+                            <div class="lt-field">
+                                <label for="lt-m-acceso">Número de acceso (opcional)</label>
+                                <input id="lt-m-acceso" maxlength="16" spellcheck="false" autocapitalize="off" aria-describedby="lt-m-acceso-help lt-m-acceso-error" />
+                                <small id="lt-m-acceso-help">Hasta 16 caracteres: letras, números, espacio, punto, guion o guion bajo.</small>
+                                <span id="lt-m-acceso-error" class="lt-field-error" hidden></span>
+                            </div>
+                        </div>
+                        <div id="lt-data-fields" class="lt-data" hidden aria-describedby="lt-data-help">
+                            <p class="lt-subtitle">Datos que regresan de la entrada</p>
+                            <p class="lt-note" id="lt-data-help">Marca los datos de la entrada que quieres que viajen dentro de la imagen de prueba. Los que no marques se quedan con el valor técnico de la prueba: identidad sintética, modalidad OT, descripción «PRUEBA TECNICA - NO DIAGNOSTICO», fecha y hora de ahora y estudio nuevo.</p>
+                            <div class="lt-grid lt-grid-data">
+                                <label class="lt-check"><input id="lt-d-nombre" type="checkbox" value="nombre" checked /><span>Nombre</span></label>
+                                <label class="lt-check"><input id="lt-d-id" type="checkbox" value="id" checked /><span>ID del paciente</span></label>
+                                <label class="lt-check"><input id="lt-d-acceso" type="checkbox" value="acceso" checked /><span>Número de acceso</span></label>
+                                <label class="lt-check"><input id="lt-d-modalidad" type="checkbox" value="modalidad" checked /><span>Modalidad</span></label>
+                                <label class="lt-check"><input id="lt-d-procedimiento" type="checkbox" value="procedimiento" checked /><span>Procedimiento</span></label>
+                                <label class="lt-check"><input id="lt-d-programado" type="checkbox" value="programado" checked /><span>Fecha y hora programadas</span></label>
+                                <label class="lt-check"><input id="lt-d-uid" type="checkbox" value="estudioUid" checked /><span>UID del estudio</span></label>
+                            </div>
+                            <p class="lt-note" id="lt-data-status" role="status" aria-live="polite"></p>
+                        </div>
+                    </fieldset>
+                    <div class="lt-actions lt-send-actions">
+                        <button id="lt-send" class="lt-button" type="submit" hidden disabled>Enviar prueba</button>
+                        <p id="lt-send-permission" class="lt-note">Verificando permiso de envío…</p>
+                    </div>
+                    <p id="lt-send-status" class="lt-message" role="status" aria-live="polite" hidden></p>
+                </form>
+            </div>
+        </div>
+        <p class="lt-technical-note">C-ECHO (Ping) solo comprueba la conexión DICOM; no garantiza que el destino admita MWL, Storage ni la consulta de estudios ya archivados. Cada envío confirmado manda una sola imagen, sin reintentos automáticos, y después de enviarla se le pregunta al mismo nodo qué tiene de ese estudio: esa respuesta es la que aparece en el registro.</p>
+    </section>
+
+    <section class="lt-panel" id="lt-registro" aria-labelledby="lt-registro-title">
+        <div class="lt-panel-heading">
+            <h2 id="lt-registro-title">Registro de pruebas enviadas</h2>
+            <div class="lt-actions">
+                <span id="lt-registro-count" class="lt-note" role="status" aria-live="polite">0 envíos</span>
+                <button id="lt-registro-refresh" class="lt-button" type="button">Actualizar</button>
+            </div>
+        </div>
+        <p class="lt-note" id="lt-registro-help">Cada envío confirmado queda apuntado en el servidor (App_Data/dicom-pruebas.jsonl) con la conexión usada, los tags que salieron escritos en la imagen y lo que el propio nodo respondió al preguntarle por ese estudio. Se conserva al recargar la página y al reiniciar la intranet, y aquí no hay botón de borrado.</p>
+        <p id="lt-registro-status" class="lt-message" role="status" aria-live="polite" hidden></p>
+        <div id="lt-registro-body" class="lt-table-scroll" tabindex="0" role="region" aria-label="Registro de pruebas enviadas; tabla desplazable">
+            <table class="lt-table lt-registro-table">
+                <caption>Pruebas registradas en el servidor · la más reciente arriba · se muestran hasta 50</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Hora</th>
+                        <th scope="col">Usuario</th>
+                        <th scope="col">Nodo destino</th>
+                        <th scope="col">Resultado del envío</th>
+                        <th scope="col">Qué dice el nodo que tiene</th>
+                    </tr>
+                </thead>
+                <tbody id="lt-registro-rows"></tbody>
+            </table>
+            <p id="lt-registro-vacio">Todavía no hay ninguna prueba enviada registrada en este servidor.</p>
+        </div>
+    </section>
+    <p class="lt-note lt-privacy">La lista consultada y las conexiones viven solo en memoria de esta pestaña: no se guardan en el almacenamiento del navegador. Del envío de cada prueba sí queda constancia en el servidor —en App_Data/dicom-pruebas.jsonl, con los tags que salieron y la respuesta del nodo—, y esa es la lista que se muestra arriba.</p>
+
+    <dialog id="lt-confirm-dialog" class="lt-dialog" aria-labelledby="lt-confirm-title" aria-describedby="lt-confirm-description lt-confirm-warning">
+        <h2 id="lt-confirm-title">Confirmar envío de prueba</h2>
+        <p id="lt-confirm-description">Se enviará una única imagen sintética al nodo escrito arriba, con esa misma conexión. Debajo ves, dato por dato, lo que viaja y lo que se queda con el valor técnico de la prueba; si cambias alguna casilla, esta confirmación se recalcula antes de enviar.</p>
+        <dl class="lt-confirm-data" id="lt-confirm-data"></dl>
+        <p class="lt-note" id="lt-confirm-warning">El estudio queda registrado como prueba técnica no diagnóstica. No se reintentará el envío automáticamente si su resultado es incierto.</p>
+        <div class="lt-actions lt-dialog-actions">
+            <button id="lt-confirm-cancel" class="lt-button" type="button" autofocus>Cancelar</button>
+            <button id="lt-confirm-send" class="lt-button" type="button">Confirmar y enviar una imagen</button>
+        </div>
+    </dialog>
+</main>
+
+@section Scripts {
+    <script src="/js/hoja-fecha.js?v=20261106a"></script>
+    <script src="~/js/lista-trabajo.js" asp-append-version="true" defer></script>
+}

@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <script src="/js/theme.js?v=20261119e"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reportes · Bitácora — Intranet meditechnosys</title>
+  <link rel="stylesheet" href="/css/panel.css?v=20261123a" />
+  <script src="/js/reportes-tabs.js?v=20261104d" defer></script>
+  <style>
+    /* Barra de filtros de la ventana del usuario: el día, la hora, la actividad, la bitácora de salida
+       y el texto se recortan en el navegador sobre la lista que ya trajeron. */
+    .barra-filtros { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 14px; margin: 4px 0 14px; padding: 12px 14px; background: var(--panel-2, #f8fafc); border: 1px solid var(--linea, #e2e8f0); border-radius: 8px; }
+    .barra-filtros .campo { display: flex; flex-direction: column; gap: 4px; }
+    .barra-filtros label { font-size: .74rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+    .barra-filtros input, .barra-filtros select { padding: 6px 8px; border: 1px solid var(--linea, #cbd5e1); border-radius: 6px; font-size: .86rem; color: inherit; min-width: 132px; background: var(--panel, #fff); }
+    .barra-filtros .campo.ancho { flex: 1 1 260px; }
+    .barra-filtros .campo.ancho input { width: 100%; min-width: 0; }
+    /* Selector de día. El calendario que trae <input type="date"> lo pinta el sistema: no lleva
+       nuestra paleta, no sabe qué días tienen movimientos y hay que ir mes por mes hasta dar con uno.
+       Aquí la hoja se dibuja en la página; el valor sigue viviendo en el campo de fecha oculto (#vDia),
+       que es el que lee el recorte, el Excel y el enlace ?dia=. */
+    .campo-dia .fila-dia { display: flex; align-items: stretch; gap: 6px; }
+    button.caja-dia { display: flex; align-items: center; gap: 8px; padding: 6px 10px; min-width: 158px;
+      border: 1px solid var(--linea, #cbd5e1); border-radius: 6px; background: var(--panel, #fff);
+      color: inherit; font: inherit; font-size: .86rem; text-align: left; cursor: pointer; }
+    button.caja-dia > svg:first-child { opacity: .65; flex: 0 0 auto; }
+    button.caja-dia > svg:last-child { opacity: .45; flex: 0 0 auto; margin-left: auto; }
+    button.caja-dia span { white-space: nowrap; }
+    button.caja-dia span.vacio { color: var(--muted); font-style: italic; }
+    button.caja-dia span.puesto { color: var(--dorado-t, #b8860b); font-weight: 700; }
+    button.caja-dia:hover, button.caja-dia[aria-expanded="true"] {
+      border-color: var(--dorado, #c9a227); box-shadow: 0 0 0 2px rgba(201, 162, 39, .18); }
+    button.quitar-dia { flex: 0 0 auto; width: 28px; padding: 0; border: 1px solid var(--linea, #cbd5e1);
+      border-radius: 6px; background: none; color: var(--muted); font-size: 1rem; line-height: 1; cursor: pointer; }
+    button.quitar-dia:hover { color: var(--texto); border-color: var(--dorado, #c9a227); }
+    .cal-dia { position: fixed; z-index: 40; width: 272px; padding: 10px 12px 11px; background: var(--panel, #fff);
+      color: var(--texto); border: 1px solid var(--linea, #cbd5e1); border-radius: 10px;
+      box-shadow: 0 14px 30px rgba(15, 23, 42, .3); }
+    .cal-dia .cd-cab { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 7px; }
+    .cal-dia .cd-titulo { font-size: .88rem; font-weight: 700; }
+    .cal-dia button.cd-mes { width: 26px; height: 26px; padding: 0; border: 1px solid var(--linea, #cbd5e1);
+      border-radius: 6px; background: none; color: inherit; font-size: 1rem; line-height: 1; cursor: pointer; }
+    .cal-dia button.cd-mes:hover:not(:disabled) { border-color: var(--dorado, #c9a227); color: var(--dorado-t, #b8860b); }
+    .cal-dia button.cd-mes:disabled { opacity: .3; cursor: default; }
+    .cal-dia .cd-dow, .cal-dia .cd-dias { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .cal-dia .cd-dow span { text-align: center; font-size: .68rem; font-weight: 700; color: var(--muted); }
+    .cal-dia .cd-dias button { position: relative; height: 29px; padding: 0; border: 1px solid transparent;
+      border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: .78rem; cursor: default; }
+    .cal-dia .cd-dias button:disabled { opacity: .35; }
+    .cal-dia .cd-dias button.libre { color: var(--texto); background: rgba(201, 162, 39, .13);
+      border-color: rgba(201, 162, 39, .35); cursor: pointer; font-weight: 600; }
+    .cal-dia .cd-dias button.libre:hover { background: rgba(201, 162, 39, .28); border-color: var(--dorado, #c9a227); }
+    .cal-dia .cd-dias button.hoy::after { content: ''; position: absolute; left: 50%; bottom: 3px; width: 4px;
+      height: 4px; margin-left: -2px; border-radius: 50%; background: var(--dorado, #c9a227); }
+    .cal-dia .cd-dias button.sel { background: var(--dorado, #c9a227); border-color: var(--dorado-t, #b8860b);
+      color: #14202e; font-weight: 700; }
+    .cal-dia .cd-pies { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--linea, #e2e8f0); }
+    .cal-dia .cd-pies .cd-ct { font-size: .7rem; color: var(--muted); }
+    .cal-dia .cd-pies .cd-botones { display: flex; gap: 5px; }
+    .cal-dia .cd-pies button { padding: 3px 8px; border: 1px solid var(--linea, #cbd5e1); border-radius: 6px;
+      background: none; color: inherit; font-size: .74rem; cursor: pointer; }
+    .cal-dia .cd-pies button:hover { border-color: var(--dorado, #c9a227); color: var(--dorado-t, #b8860b); }
+    /* La hoja tiene modos (día · mes · año · rango) y rejillas que no son de siete columnas. */
+    .cal-dia .cd-modos { display: flex; gap: 4px; margin: -2px 0 9px; }
+    .cal-dia .cd-modos button { flex: 1 1 0; padding: 4px 2px; border: 1px solid var(--linea, #cbd5e1);
+      border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: .74rem; cursor: pointer; }
+    .cal-dia .cd-modos button:hover { color: var(--texto); border-color: var(--dorado, #c9a227); }
+    .cal-dia .cd-modos button.sel { background: rgba(201, 162, 39, .16); border-color: var(--dorado, #c9a227);
+      color: var(--dorado-t, #b8860b); font-weight: 700; }
+    .cal-dia .cd-dow.oculto, .cal-dia .cd-cab.oculto { display: none; }
+    .cal-dia .cd-dias.tres { grid-template-columns: repeat(3, 1fr); }
+    .cal-dia .cd-dias.cuatro { grid-template-columns: repeat(4, 1fr); }
+    .cal-dia .cd-dias.seis { grid-template-columns: repeat(6, 1fr); }
+    .cal-dia .cd-dias.tres button, .cal-dia .cd-dias.cuatro button { height: 33px; }
+    .cal-dia .cd-dias button.enrango { color: var(--texto); background: rgba(201, 162, 39, .08);
+      border-color: rgba(201, 162, 39, .22); cursor: pointer; }
+    .cal-dia .cd-dias button.pendiente { border-color: var(--dorado, #c9a227); color: var(--dorado-t, #b8860b);
+      font-weight: 700; }
+    .cal-dia .cd-pies { flex-wrap: wrap; }
+    .cal-dia.cal-hora { width: 246px; }
+    .caja-dia.caja-hora { min-width: 150px; }
+    .resumen { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 12px; font-size: .84rem; color: var(--muted); }
+    .resumen b { color: var(--texto); font-size: .95rem; }
+    .resumen .corte { color: var(--warn); }
+    .resumen .fijo { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px;
+      border: 1px solid var(--dorado, #d4af37); border-radius: 12px; font-size: .78rem; color: var(--texto); }
+    .resumen .fijo button { border: 0; background: none; cursor: pointer; color: inherit; font: inherit; padding: 0; }
+    td.momento { font-family: Consolas, monospace; font-size: .8rem; white-space: nowrap; }
+    td.usuario { font-weight: 600; overflow-wrap: anywhere; }
+    td.ip { font-family: Consolas, monospace; font-size: .8rem; }
+    td.ip small { display: block; color: var(--muted); font-size: .72rem; font-family: Consolas, monospace; word-break: break-all; }
+    td.lugar small { display: block; font-size: .72rem; color: var(--muted); font-style: italic; }
+    td.lugar small.real { color: var(--ok, #16a34a); font-style: normal; font-weight: 600; }
+    /* Actividad: manda la palabra; debajo, de qué bitácora salió y cómo terminó. */
+    td.acto { font-size: .86rem; }
+    td.acto .origen { display: block; font-size: .7rem; color: var(--muted); margin-top: 2px; }
+    code.res { font-family: Consolas, monospace; font-size: .7rem; padding: 1px 7px; border-radius: 10px; border: 1px solid currentColor; white-space: nowrap; }
+    code.res.parcial { color: #7c2d12; background: rgba(245,158,11,.16); border-color: var(--warn); }
+    code.res.error { color: #7f1d1d; background: rgba(180,38,30,.14); border-color: #b4261e; }
+    code.res.cancelado { color: #334155; background: rgba(100,116,139,.16); }
+    td.que .modulo { font-weight: 600; color: var(--dorado-t); }
+    .secundario { display: block; font-size: .72rem; color: var(--muted); word-break: break-all; }
+    button.lote { display: inline-block; margin-left: 6px; padding: 0; border: 0; background: none;
+      font-family: Consolas, monospace; font-size: .7rem; color: var(--dorado, #c9a227); cursor: pointer; }
+    button.lote:hover { text-decoration: underline; color: var(--dorado-t, #b8860b); }
+    th { white-space: nowrap; }
+    .aviso-cargando { padding: 14px; color: var(--muted); font-size: .9rem; }
+    /* La rejilla es ancha por naturaleza: con layout fijo y estas medidas entra completa en 1280 px
+       y por debajo se desplaza en horizontal sin romperse. */
+    .table-wrap table { table-layout: fixed; min-width: 1040px; }
+    .table-wrap th, .table-wrap td { padding: 9px 10px; vertical-align: top; overflow-wrap: anywhere; }
+    col.c-fecha { width: 90px; } col.c-hora { width: 74px; } col.c-usuario { width: 126px; }
+    col.c-actividad { width: 150px; } col.c-ip { width: 128px; } col.c-lugar { width: 188px; }
+    tr.fila-usuario { cursor: pointer; }
+    tr.fila-usuario:hover td { background: var(--panel-2); }
+    /* El usuario que tiene su ventana abierta queda marcado. */
+    tr.fila-usuario.activa td { background: rgba(201, 162, 39, .16); box-shadow: inset 3px 0 0 var(--dorado, #c9a227); }
+    tr.fila-usuario.activa td:first-child { font-weight: 700; }
+    td.donde-cel { font-size: .8rem; color: var(--muted); }
+    td.donde-cel .eq { color: var(--texto); font-weight: 600; }
+    td.donde-cel .mono { font-family: Consolas, monospace; }
+    .fuente { font-style: italic; opacity: .75; }
+    .fuente.real { color: var(--ok, #16a34a); font-style: normal; font-weight: 600; opacity: 1; }
+    code.estado { font-family: Consolas, monospace; font-size: .78rem; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--ok); color: #052e16; background: rgba(34,197,94,.12); }
+    code.estado.desconectado { border-color: var(--warn); color: #7c2d12; background: rgba(245,158,11,.14); }
+    td.momento-usuario { white-space: nowrap; font-family: Consolas, monospace; font-size: .82rem; }
+    /* Ventana del usuario: la misma rejilla, en un emergente ancho con su propia barra de filtros. */
+    dialog.ventana-bitacora { max-width: 1320px; width: calc(100% - 24px); }
+    dialog.ventana-bitacora .modal-form { max-height: 88vh; gap: 12px; }
+    dialog.ventana-bitacora .barra-filtros { margin: 0; }
+    dialog.ventana-bitacora .resumen { margin: 0; }
+    /* La tabla rueda dentro de la ventana: el título, los filtros y los botones siempre quedan a mano. */
+    .ventana-tabla { max-height: 52vh; overflow: auto; border: 1px solid var(--linea, #e2e8f0); border-radius: 6px; }
+    .ventana-tabla thead th { position: sticky; top: 0; z-index: 1; background: var(--panel-2, #f8fafc); }
+  </style>
+  <link rel="stylesheet" href="/css/theme.css?v=20261120f" />
+</head>
+<body class="theme-panel">
+  <header>
+    <h1>Reportes</h1>
+    <div class="logo-centro">Meditechnosys<span>Medical Technology Solutions</span></div>
+    <span class="badge" id="badgeUsuario">…</span>
+    <div class="botones-nav">
+      <button class="boton-nav" onclick="window.location.href='/'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Regresar
+      </button>
+      <button class="boton-nav" onclick="window.location.href='/'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Home
+      </button>
+    </div>
+  </header>
+  <div class="fondo-logo" aria-hidden="true"></div>
+
+  <main class="page-wide">
+    <nav class="reportes-tabs" data-reportes-activo="bitacora" aria-label="Apartados de Reportes">
+      <a class="reportes-tab" href="/admin/bitacora/index.html" aria-current="page">Bitácora</a>
+    </nav>
+    <section class="card" id="seccionUsuarios">
+      <h2>Usuarios · conexión, último acceso y desde dónde</h2>
+      <p class="hint" style="margin:0 0 10px">
+        Un usuario aparece <strong>Conectado</strong> si tuvo actividad en los últimos minutos; si no,
+        <strong>Desconectado</strong> con su última conexión. <strong>Haz clic en cualquiera</strong> y
+        se abre una <strong>ventana con todas sus actividades</strong> —mezcladas por hora, con filtros
+        propios por día, hora, actividad, bitácora o texto y su descarga a Excel.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th id="thUsuario">Usuario</th><th id="thEstado">Estado</th><th id="thUltimo">Última conexión</th><th id="thDonde">Equipo · IP · Ubicación</th><th id="thDisp">Dispositivo</th></tr></thead>
+          <tbody id="cuerpoUsuarios"></tbody>
+        </table>
+      </div>
+      <p class="empty" id="vacioUsuarios" hidden>No hay usuarios.</p>
+      <p class="hint" id="estadoUbicacion" style="margin:12px 0 0"></p>
+    </section>
+  </main>
+
+  <!-- Ventana del usuario: la tabla de esa persona, abierta al hacer clic en la tarjeta de arriba. -->
+  <dialog id="ventanaUsuario" class="modal ventana-bitacora" aria-label="Movimientos de un usuario">
+    <div class="modal-form">
+      <h3 id="ventanaTitulo">Movimientos</h3>
+      <p class="hint" id="ventanaSub" style="margin:0"></p>
+      <div class="barra-filtros">
+        <div class="campo campo-dia">
+          <label for="vDiaBtn">Periodo</label>
+          <div class="fila-dia">
+            <button type="button" class="caja-dia" id="vDiaBtn" aria-haspopup="dialog" aria-expanded="false"
+                    title="Elegir el periodo: un día, un mes, un año o un rango de fechas">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <span id="vDiaTxt" class="vacio">Cualquier día</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <button type="button" class="quitar-dia" id="vDiaQuitar" title="Quitar el filtro de periodo"
+                    aria-label="Quitar el filtro de periodo" hidden>×</button>
+          </div>
+          <!-- Lo elegido se guarda aquí: #vDia/#vDiaHasta en yyyy-mm-dd (los dos incluidos) y #vModo
+               dice si fue un día, un mes, un año o un rango. Es lo que lee el recorte, el Excel y el
+               enlace ?dia=/?mes=/?anio=/?desde=&hasta=. -->
+          <input type="date" id="vDia" hidden tabindex="-1" aria-hidden="true" />
+          <input type="date" id="vDiaHasta" hidden tabindex="-1" aria-hidden="true" />
+          <input type="text" id="vModo" hidden tabindex="-1" aria-hidden="true" />
+        </div>
+        <div class="campo campo-dia">
+          <label for="vHoraBtn">Hora</label>
+          <div class="fila-dia">
+            <button type="button" class="caja-dia caja-hora" id="vHoraBtn" aria-haspopup="dialog"
+                    aria-expanded="false" title="Elegir una hora concreta o un rango de horas">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+              <span id="vHoraTxt" class="vacio">Todas las horas</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <button type="button" class="quitar-dia" id="vHoraQuitar" title="Quitar el filtro de hora"
+                    aria-label="Quitar el filtro de hora" hidden>×</button>
+          </div>
+          <!-- Hora inicial y final, las dos incluidas, en horario de esta pantalla. -->
+          <input type="number" id="vHora" min="0" max="23" hidden tabindex="-1" aria-hidden="true" />
+          <input type="number" id="vHoraHasta" min="0" max="23" hidden tabindex="-1" aria-hidden="true" />
+        </div>
+        <div class="campo">
+          <label for="vActividad">Actividad</label>
+          <select id="vActividad"><option value="">Todas</option></select>
+        </div>
+        <div class="campo">
+          <label for="vFuente">Salió de</label>
+          <select id="vFuente">
+            <option value="">Las dos bitácoras</option>
+            <option value="intranet">Solo la intranet</option>
+            <option value="quemador">Solo el quemador</option>
+          </select>
+        </div>
+        <div class="campo ancho">
+          <label for="vTexto">Buscar en la fila</label>
+          <input type="search" id="vTexto" autocomplete="off"
+                 placeholder="paciente, IP, equipo, calle, UID, unidad o lo que hizo" />
+        </div>
+      </div>
+      <div class="resumen" id="ventanaResumen"></div>
+      <div class="table-wrap ventana-tabla">
+        <table>
+          <colgroup>
+            <col class="c-fecha" /><col class="c-hora" /><col class="c-usuario" /><col class="c-actividad" />
+            <col class="c-ip" /><col class="c-lugar" /><col />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Hora</th><th>Usuario</th><th>Actividad</th>
+              <th>IP · Equipo</th><th>Ubicación geográfica</th><th>Qué fue lo que hizo</th>
+            </tr>
+          </thead>
+          <tbody id="ventanaCuerpo"></tbody>
+        </table>
+      </div>
+      <p class="empty" id="ventanaVacio" hidden></p>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="ventanaLimpiar">Limpiar filtros</button>
+        <button class="btn-primary" id="ventanaExcel">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Descargar su Excel
+        </button>
+        <button class="btn-secondary" id="ventanaCerrar">Cerrar</button>
+      </div>
+    </div>
+
+    <!-- Hoja de periodo de la ventana: se dibuja aquí y se ancla junto al campo (por eso es
+         position:fixed, para que el desplazamiento de la tabla no la corte). Tiene cuatro modos:
+         día, mes, año y rango; la rejilla y los botones de abajo cambian con el modo. -->
+    <div class="cal-dia" id="vCal" role="dialog" aria-label="Hoja para elegir el periodo" hidden>
+      <div class="cd-modos" id="vCalModos">
+        <button type="button" data-modo="dia">Día</button>
+        <button type="button" data-modo="mes">Mes</button>
+        <button type="button" data-modo="anio">Año</button>
+        <button type="button" data-modo="rango">Rango</button>
+      </div>
+      <div class="cd-cab" id="vCalCab">
+        <button type="button" class="cd-mes" id="vCalAtras" aria-label="Etiqueta anterior" title="Anterior">‹</button>
+        <span class="cd-titulo" id="vCalTitulo">—</span>
+        <button type="button" class="cd-mes" id="vCalAdelante" aria-label="Etiqueta siguiente" title="Siguiente">›</button>
+      </div>
+      <div class="cd-dow" id="vCalDow"><span>l</span><span>m</span><span>x</span><span>j</span><span>v</span><span>s</span><span>d</span></div>
+      <div class="cd-dias" id="vCalDias"></div>
+      <div class="cd-pies">
+        <span class="cd-ct" id="vCalNota"></span>
+        <span class="cd-botones" id="vCalBotones"></span>
+      </div>
+    </div>
+
+    <!-- Lo mismo para la hora: una hora suelta o un rango de horas, con las horas que ese periodo sí
+         tiene registradas marcadas en dorado. -->
+    <div class="cal-dia cal-hora" id="vHoraCal" role="dialog" aria-label="Hoja para elegir la hora" hidden>
+      <div class="cd-modos" id="vHoraModos">
+        <button type="button" data-hmodo="una">Una hora</button>
+        <button type="button" data-hmodo="rango">Rango</button>
+      </div>
+      <div class="cd-dias seis" id="vHoraDias"></div>
+      <div class="cd-pies">
+        <span class="cd-ct" id="vHoraNota"></span>
+        <span class="cd-botones" id="vHoraBotones"></span>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+  (function () {
+    'use strict';
+
+    function api(url) {
+      return fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (data) {
+            if (!r.ok) throw new Error(data.error || ('Error ' + r.status));
+            return data;
+          });
+        });
+    }
+
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+
+    // Quita acentos y mayúsculas: «Quemado en CD/DVD» se encuentra escribiendo «quem» o «cd».
+    function normaliza(s) {
+      return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
+    // ---- Columnas ----
+    function celdaActividad(td, m) {
+      td.className = 'acto';
+      td.appendChild(document.createTextNode(m.actividad || '—'));
+      // El chip de resultado solo cuando algo no salió redondo: un renglón de éxito no va lleno de etiquetas.
+      var r = normaliza(m.resultado || '');
+      if (r && r !== 'exito') {
+        var chip = document.createElement('code');
+        chip.className = 'res ' + r;
+        chip.textContent = m.resultado;
+        td.appendChild(document.createTextNode(' '));
+        td.appendChild(chip);
+      }
+      var origen = document.createElement('small');
+      origen.className = 'origen';
+      origen.textContent = esQuemador(m) ? 'del programa del quemador' : 'de la intranet';
+      td.appendChild(origen);
+    }
+
+    function esQuemador(m) { return normaliza(m.origen).indexOf('quem') >= 0; }
+
+    // La hora de la fila, en dos dígitos y en la hora de esta pantalla. La escribe el servidor
+    // («14:05:12»); si un renglón antiguo no la trae, se saca del navegador.
+    function horaDe(m) {
+      if (m.hora && /^\d\d:/.test(m.hora)) return m.hora.substring(0, 2);
+      var d = new Date(m.momento);
+      return isNaN(d) ? '' : p(d.getHours());
+    }
+
+    function celdaIp(td, m) {
+      td.className = 'ip';
+      td.textContent = m.ip || '—';
+      var debajo = [];
+      if (m.equipo) debajo.push(m.equipo);
+      if (m.ipLocal) debajo.push('local ' + m.ipLocal);
+      if (debajo.length) {
+        var s = document.createElement('small');
+        s.textContent = debajo.join(' · ');
+        if (m.ipLocal) s.title = 'Direcciones que la propia máquina declaró: ' + m.ipLocal;
+        td.appendChild(s);
+      }
+    }
+
+    function celdaLugar(td, m) {
+      td.className = 'lugar';
+      td.textContent = m.ubicacion || 'Sin confirmar';
+      if (m.fuenteUbicacion) {
+        var metro = Number(m.precisionMetros || 0);
+        var s = document.createElement('small');
+        s.textContent = m.fuenteUbicacion + (metro > 0 ? ' (±' + metro + ' m)' : '');
+        if (m.fuenteUbicacion.indexOf('real') >= 0) s.className = 'real';
+        if (m.coordenadas) s.title = 'Punto del mapa: ' + m.coordenadas;
+        td.appendChild(s);
+      }
+    }
+
+    function celdaQue(td, m) {
+      td.className = 'que';
+      if (m.modulo) {
+        var mod = document.createElement('span');
+        mod.className = 'modulo';
+        mod.textContent = m.modulo + ' → ';
+        td.appendChild(mod);
+      }
+      td.appendChild(document.createTextNode(m.detalle || '—'));
+      if (m.lote) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'lote';
+        b.textContent = 'lote ' + m.lote;
+        b.title = 'Dejar a la vista solo las filas de esta misma acción';
+        b.addEventListener('click', function () { fijarLoteVentana(m.lote); });
+        td.appendChild(b);
+      }
+      if (m.estudioUid) {
+        var uid = document.createElement('span');
+        uid.className = 'secundario';
+        uid.textContent = m.estudioUid;
+        uid.title = m.estudioUid;
+        td.appendChild(uid);
+      }
+      if (m.dispositivo) {
+        var d = document.createElement('span');
+        d.className = 'secundario';
+        d.textContent = m.dispositivo;
+        td.appendChild(d);
+      }
+    }
+
+    // Todo el texto de la fila, por si el servidor no trajera su campo de búsqueda.
+    function filaTextual(m) {
+      return [m.ip, m.ipLocal, m.equipo, m.ubicacion, m.dispositivo, m.usuario, m.actividad,
+              m.modulo, m.detalle, m.paciente, m.pacienteId, m.acceso, m.estudioUid,
+              m.medio, m.unidad, m.lote, m.resultado, m.origen].join(' ');
+    }
+
+    // Un renglón de la bitácora, tal como lo pinta la ventana del usuario.
+    function filaDe(m) {
+      var d = new Date(m.momento);
+      var tr = document.createElement('tr');
+      // La fecha y la hora ya vienen escritas por el servidor en la hora de aquí: se usan tal cual,
+      // y solo se calculan en el navegador si un renglón viejo no las trajera.
+      var f = document.createElement('td'); f.className = 'momento';
+      f.textContent = m.fecha || (isNaN(d) ? (m.momento || '—')
+        : p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear());
+      var h = document.createElement('td'); h.className = 'momento';
+      h.textContent = m.hora || (isNaN(d) ? '' : p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()));
+      var u = document.createElement('td'); u.className = 'usuario'; u.textContent = m.usuario || '—';
+      var a = document.createElement('td'); celdaActividad(a, m);
+      var ip = document.createElement('td'); celdaIp(ip, m);
+      var lg = document.createElement('td'); celdaLugar(lg, m);
+      var qz = document.createElement('td'); celdaQue(qz, m);
+      [f, h, u, a, ip, lg, qz].forEach(function (x) { tr.appendChild(x); });
+      if (m.lote) tr.title = 'Lote ' + m.lote;
+      return tr;
+    }
+
+    function contar(lista) {
+      var c = { ingresos: 0, fallidos: 0, busquedas: 0, descargas: 0, quemados: 0, errores: 0 };
+      lista.forEach(function (m) {
+        var act = normaliza(m.actividad);
+        if (act.indexOf('inicio de sesion') === 0) c.ingresos++;
+        if (act.indexOf('intento') === 0 && act.indexOf('fallido') > 0) c.fallidos++;
+        if (act.indexOf('busqueda') === 0) c.busquedas++;
+        if (act.indexOf('descarga') === 0) c.descargas++;
+        if (act.indexOf('quem') === 0) c.quemados++;
+        if (normaliza(m.resultado) === 'error') c.errores++;
+      });
+      return c;
+    }
+
+    // Los contadores de siempre, escritos en la caja que se le indique (hoja o ventana).
+    function renglonesResumen(caja, lista) {
+      var c = contar(lista);
+      caja.innerHTML = '';
+      function dato(etiqueta, valor) {
+        var span = document.createElement('span');
+        var b = document.createElement('b');
+        b.textContent = String(valor);
+        span.appendChild(b);
+        span.appendChild(document.createTextNode(' ' + etiqueta));
+        caja.appendChild(span);
+      }
+      if (!lista.length) return;
+      dato('movimiento(s)', lista.length);
+      if (c.ingresos) dato('entrada(s)', c.ingresos);
+      if (c.fallidos) dato('contraseña mal', c.fallidos);
+      if (c.busquedas) dato('búsqueda(es)', c.busquedas);
+      if (c.descargas) dato('descarga(s)', c.descargas);
+      if (c.quemados) dato('quemado(s)', c.quemados);
+      if (c.errores) dato('con error', c.errores);
+    }
+
+    // Recorte con su × (lote, usuario) que se puede quitar sin tocar los desplegables.
+    function chipFijo(texto, titulo, alQuitar) {
+      var fijo = document.createElement('span');
+      fijo.className = 'fijo';
+      fijo.appendChild(document.createTextNode(texto));
+      var quitar = document.createElement('button');
+      quitar.type = 'button';
+      quitar.textContent = '×';
+      quitar.title = titulo;
+      quitar.addEventListener('click', alQuitar);
+      fijo.appendChild(quitar);
+      return fijo;
+    }
+
+    // ---- Tarjeta de usuarios (lo único que hay en la página; se llena con el resumen de accesos) ----
+    // Cada fila se apunta por usuario para poder marcarla mientras su ventana esté abierta.
+    var _filasUsuario = {};
+    function marcarFilaUsuario(activo) {
+      Object.keys(_filasUsuario).forEach(function (k) {
+        var tr = _filasUsuario[k];
+        if (k === activo) tr.classList.add('activa');
+        else tr.classList.remove('activa');
+      });
+    }
+
+    // ---- Ventana emergente del usuario -------------------------------------
+    // Al hacer clic en la tarjeta de arriba se abre SU tabla en un emergente con filtros propios;
+    // la hoja de abajo sigue con lo que estuviera mostrando (todos, o el filtro que se le haya dado).
+    var ventana = document.getElementById('ventanaUsuario');
+    var ventanaCuerpo = document.getElementById('ventanaCuerpo');
+    var ventanaResumen = document.getElementById('ventanaResumen');
+    var ventanaVacio = document.getElementById('ventanaVacio');
+    var vCampos = {
+      dia: document.getElementById('vDia'),
+      diaHasta: document.getElementById('vDiaHasta'),
+      modo: document.getElementById('vModo'),
+      hora: document.getElementById('vHora'),
+      horaHasta: document.getElementById('vHoraHasta'),
+      actividad: document.getElementById('vActividad'),
+      fuente: document.getElementById('vFuente'),
+      texto: document.getElementById('vTexto')
+    };
+    var _ventanaUsuario = '';
+    var _ventanaTodas = [];
+    var _ventanaLote = '';
+    var _ventanaPeticion = null;
+    var _indiceDias = {};      // 'yyyy-mm-dd' → renglones de ese día (lo da /api/bitacora/periodos)
+    var _indiceUsuario = '';   // de qué usuario es ese índice, para no volver a pedirlo
+    var _cargadoDesde = '';    // el rango con el que se pidió la última vez, para no repetir la llamada
+    var _cargadoHasta = '';
+    var _cargando = false;     // hay una llamada en vuelo: la ventana lo avisa en vez de decir «no hay»
+
+    // El día se recorta aquí mismo (la ventana ya trae al usuario completo), así que la caja de fecha
+    // —yyyy-mm-dd— se compara con la fecha que escribió el servidor en cada renglón.
+    function diaDe(m) {
+      if (m.fecha) {
+        var t = String(m.fecha).split('/');
+        if (t.length === 3) return t[2] + '-' + t[1] + '-' + t[0];
+      }
+      var d = new Date(m.momento);
+      if (isNaN(d)) return '';
+      return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    }
+
+    function filtradasVentana() {
+      var desde = vCampos.dia.value;
+      var hasta = vCampos.diaHasta.value || desde;
+      var hd = vCampos.hora.value;
+      var hh = vCampos.horaHasta.value;
+      if (hh === '') hh = hd;
+      var act = vCampos.actividad.value;
+      var fuente = normaliza(vCampos.fuente.value);
+      var q = normaliza(vCampos.texto.value).trim();
+      return _ventanaTodas.filter(function (m) {
+        // El periodo siempre queda en desde..hasta (los dos incluidos) y en yyyy-mm-dd, así que
+        // comparar cadenas alcanza: 'dia' pone los dos iguales, 'mes' y 'anio' sus extremos.
+        if (desde) {
+          var k = diaDe(m);
+          if (!k || k < desde || k > hasta) return false;
+        }
+        if (hd !== '') {
+          var hr = horaDe(m);
+          if (hr === '' || Number(hr) < Number(hd) || Number(hr) > Number(hh)) return false;
+        }
+        if (act && m.actividad !== act) return false;
+        if (fuente.indexOf('quem') === 0 && !esQuemador(m)) return false;
+        if (fuente === 'intranet' && esQuemador(m)) return false;
+        if (q && normaliza(m.textoBuscable || filaTextual(m)).indexOf(q) < 0) return false;
+        if (_ventanaLote && m.lote !== _ventanaLote) return false;
+        return true;
+      });
+    }
+
+    function pintarVentana() {
+      var lista = filtradasVentana();
+      ventanaCuerpo.innerHTML = '';
+      lista.forEach(function (m) { ventanaCuerpo.appendChild(filaDe(m)); });
+      renglonesResumen(ventanaResumen, lista);
+      if (_cargando) {
+        var avisa = document.createElement('span');
+        avisa.className = 'corte';
+        avisa.textContent = '(cargando…)';
+        ventanaResumen.appendChild(avisa);
+      }
+      if (_ventanaLote) {
+        ventanaResumen.appendChild(chipFijo('lote ' + _ventanaLote, 'Quitar el filtro de lote',
+          function () { fijarLoteVentana(''); }));
+      }
+      ventanaVacio.hidden = lista.length > 0;
+      if (!lista.length) {
+        // Mientras el servidor contesta el recorte nuevo no se le dice a nadie «aquí no hay nada»:
+        // lo que falta es la respuesta, no los movimientos.
+        // Y el índice de días dice si el usuario tiene historia, pase lo que pase en el recorte:
+        // un periodo sin movimientos no es «no tiene movimientos registrados», es ese periodo el
+        // que viene vacío, y así se lo decimos para que no busquen un error donde no lo hay.
+        var d = vCampos.dia.value;
+        var h = vCampos.diaHasta.value || d;
+        var recorte = !d ? '' : (h === d ? 'el ' + diaLegible(d) : 'del ' + diaLegible(d) + ' al ' + diaLegible(h));
+        var tieneHistoria = _ventanaTodas.length > 0 || Object.keys(_indiceDias).length > 0;
+        ventanaVacio.textContent = _cargando
+          ? 'Cargando los movimientos de ' + _ventanaUsuario + '…'
+          : (!tieneHistoria
+            ? _ventanaUsuario + ' no tiene movimientos registrados.'
+            : recorte
+              ? 'Ningún movimiento de ' + _ventanaUsuario + ' ' + recorte + '. Quitar el periodo (×) muestra toda su historia.'
+              : 'Ningún movimiento de ' + _ventanaUsuario + ' coincide con los filtros seleccionados.');
+      }
+      sincronizarPeriodo();
+      sincronizarHora();
+    }
+
+    function fijarLoteVentana(l) { _ventanaLote = l || ''; pintarVentana(); }
+
+    // ---- Hojas de periodo y de hora de la ventana ----------------------------
+    // Ni el calendario del sistema ni la lista de horas sirven aquí: los pinta Windows, no llevan
+    // nuestra paleta y ofrecen cualquier fecha o cualquier hora aunque ese día nunca dejó un renglón.
+    // Las dos cajas se dibujan en la página. La de periodo tiene cuatro modos —Día, Mes, Año y Rango—
+    // y la de hora dos —Una hora y Rango—. Lo elegido se escribe en los campos ocultos
+    // (#vDia/#vDiaHasta/#vModo y #vHora/#vHoraHasta): eso es lo que lee el recorte, el Excel y el
+    // enlace de la dirección, así que por fuera no cambió nada.
+    var cal = document.getElementById('vCal');
+    var calDias = document.getElementById('vCalDias');
+    var calTitulo = document.getElementById('vCalTitulo');
+    var calNota = document.getElementById('vCalNota');
+    var calAtras = document.getElementById('vCalAtras');
+    var calAdelante = document.getElementById('vCalAdelante');
+    var calCab = document.getElementById('vCalCab');
+    var calDow = document.getElementById('vCalDow');
+    var calModos = document.getElementById('vCalModos');
+    var calBotones = document.getElementById('vCalBotones');
+    var btnDia = document.getElementById('vDiaBtn');
+    var txtDia = document.getElementById('vDiaTxt');
+    var btnQuitar = document.getElementById('vDiaQuitar');
+    var hojaHora = document.getElementById('vHoraCal');
+    var hojaDias = document.getElementById('vHoraDias');
+    var notaHora = document.getElementById('vHoraNota');
+    var modosHora = document.getElementById('vHoraModos');
+    var botonesHora = document.getElementById('vHoraBotones');
+    var btnHora = document.getElementById('vHoraBtn');
+    var txtHora = document.getElementById('vHoraTxt');
+    var btnQuitarHora = document.getElementById('vHoraQuitar');
+    var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    var _calMes = null;          // { a, m }: mes (día/rango) o año (mes/año) que se está viendo
+    var _calModo = 'dia';        // el modo que se está viendo en la hoja de periodo
+    var _calPendiente = '';      // rango en curso: el día inicial ya marcado
+    var _horaModo = 'una';       // el modo de la hoja de horas
+    var _horaPendiente = null;   // rango de horas en curso: la hora inicial
+    var _hojaAbierta = null;     // la hoja que está a la vista
+    var _calForm = null;         // el contenedor que rueda, para mover las hojas con él
+    var _hojaRecienCerrada = false;   // el primer clic de fuera es para la hoja, no para la ventana
+
+    function claveDia(a, m, d) { return a + '-' + p(m + 1) + '-' + p(d); }
+
+    function hoyito() {
+      var d = new Date();
+      return { a: d.getFullYear(), m: d.getMonth(), d: d.getDate() };
+    }
+
+    function ultimoDia(a, m) { return new Date(a, m + 1, 0).getDate(); }
+
+    // Cuántos renglones dejó cada día. La fuente es el índice del servidor (/api/bitacora/periodos),
+    // que conoce TODA la historia del usuario y no solo los renglones que la ventana alcanzó a cargar
+    // —que además ya vienen recortados por el periodo elegido—. Si el índice no llegó, se cuenta lo
+    // que hay en pantalla.
+    function mapaDias() {
+      if (Object.keys(_indiceDias).length) return _indiceDias;
+      var por = {};
+      _ventanaTodas.forEach(function (m) {
+        var k = diaDe(m);
+        if (k) por[k] = (por[k] || 0) + 1;
+      });
+      return por;
+    }
+
+    // Cuántos renglones cayó en cada hora, sobre lo que la ventana tiene cargado: como lo cargado ya
+    // es el periodo elegido, la cuenta es exactamente la que se está viendo.
+    function mapaHoras() {
+      var por = {};
+      _ventanaTodas.forEach(function (m) {
+        var k = horaDe(m);
+        if (k) por[k] = (por[k] || 0) + 1;
+      });
+      return por;
+    }
+
+    function hayEnMes(por, a, m) {
+      var pref = a + '-' + p(m + 1);
+      return Object.keys(por).some(function (k) { return k.indexOf(pref) === 0; });
+    }
+
+    function hayEnAnio(por, a) {
+      return Object.keys(por).some(function (k) { return k.slice(0, 4) === String(a); });
+    }
+
+    // Suma los renglones de las claves que empiezan con el prefijo (un mes o un año).
+    function totalEn(por, pref) {
+      var n = 0;
+      Object.keys(por).forEach(function (k) { if (k.indexOf(pref) === 0) n += por[k]; });
+      return n;
+    }
+
+    // '2026-11-03' → '03/11/2026', igual que la columna Fecha de la tabla.
+    function diaLegible(k) {
+      var t = String(k || '').split('-');
+      return t.length === 3 ? t[2] + '/' + t[1] + '/' + t[0] : '';
+    }
+
+    // Un enlace puede traer el día al revés (dd/mm/aaaa); el campo lo quiere yyyy-mm-dd.
+    function normalizaDia(s) {
+      s = String(s || '').trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      var t = s.split('/');
+      if (t.length === 3 && /^\d{4}$/.test(t[2])) return t[2] + '-' + t[1] + '-' + t[0];
+      return '';
+    }
+
+    // ?mes= acepta 2026-11 y 11/2026.
+    function normalizaMes(s) {
+      s = String(s || '').trim();
+      var t = s.split('-');
+      if (t.length === 2 && /^\d{4}$/.test(t[0]) && /^\d{1,2}$/.test(t[1])) return t[0] + '-' + p(Number(t[1]));
+      t = s.split('/');
+      if (t.length === 2 && /^\d{4}$/.test(t[1]) && /^\d{1,2}$/.test(t[0])) return t[1] + '-' + p(Number(t[0]));
+      return '';
+    }
+
+    function normalizaAnio(s) {
+      s = String(s || '').trim();
+      return /^\d{4}$/.test(s) ? s : '';
+    }
+
+    // El recorte que le toca pedir al servidor: vacío si no hay periodo, y con los dos extremos
+    // incluidos en cualquier modo (en Día los dos caen en el mismo día).
+    function rangoVentana() {
+      var d = vCampos.dia.value;
+      if (!d) return { desde: '', hasta: '' };
+      return { desde: d, hasta: vCampos.diaHasta.value || d };
+    }
+
+    // ---- rótulos de las dos cajas ----
+    function etiquetaPeriodo() {
+      var modo = vCampos.modo.value, d = vCampos.dia.value;
+      if (!d) return 'Cualquier día';
+      var h = vCampos.diaHasta.value || d;
+      if (modo === 'mes') { var t = d.split('-'); return MESES[Number(t[1]) - 1] + ' de ' + t[0]; }
+      if (modo === 'anio') return d.split('-')[0];
+      if (h === d) return diaLegible(d);
+      return diaLegible(d) + ' – ' + diaLegible(h);
+    }
+
+    function etiquetaHora() {
+      var d = vCampos.hora.value;
+      if (d === '') return 'Todas las horas';
+      var h = vCampos.horaHasta.value;
+      if (h === '' || h === d) return p(Number(d)) + ':00 – ' + p(Number(d)) + ':59';
+      return p(Number(d)) + ':00 – ' + p(Number(h)) + ':59';
+    }
+
+    // Un botón chiquito dentro del pie de una hoja.
+    function boton(parente, texto, accion, titulo) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = texto;
+      if (titulo) b.title = titulo;
+      b.addEventListener('click', accion);
+      parente.appendChild(b);
+      return b;
+    }
+
+    function marcarChip(contenedor, activo) {
+      [].forEach.call(contenedor.querySelectorAll('button'), function (b) {
+        var llave = b.dataset.modo || b.dataset.hmodo || '';
+        b.className = llave === activo ? 'sel' : '';
+      });
+    }
+
+    // ---- la hoja de periodo ----
+    function pintarCal() {
+      var por = mapaDias();
+      marcarChip(calModos, _calModo);
+      if (_calModo === 'anio') {
+        calCab.className = 'cd-cab oculto';
+        calDow.className = 'cd-dow oculto';
+        pintarAnios(por);
+      } else if (_calModo === 'mes') {
+        calCab.className = 'cd-cab';
+        calDow.className = 'cd-dow oculto';
+        pintarMeses(por);
+      } else {
+        calCab.className = 'cd-cab';
+        calDow.className = 'cd-dow';
+        pintarDias(por);
+      }
+      pintarBotonesCal();
+    }
+
+    // Rejilla del mes: lunes primero, en dorado los días con renglones, apagados los que no.
+    // En modo rango todo día se puede pulsar, porque los extremos de un rango no tienen por qué
+    // tener movimiento alguno.
+    function pintarDias(por) {
+      var mir = _calMes || hoyito();
+      var h = hoyito();
+      var enRango = _calModo === 'rango';
+      var desde = vCampos.dia.value;
+      var hasta = vCampos.diaHasta.value || desde;
+      calTitulo.textContent = MESES[mir.m] + ' de ' + mir.a;
+      calDias.className = 'cd-dias';
+      calDias.innerHTML = '';
+      var desplaz = (new Date(mir.a, mir.m, 1).getDay() + 6) % 7;   // lunes en la primera columna
+      for (var i = 0; i < desplaz; i++) calDias.appendChild(document.createElement('span'));
+      var conDatos = 0;
+      for (var d = 1; d <= ultimoDia(mir.a, mir.m); d++) {
+        var k = claveDia(mir.a, mir.m, d);
+        var n = por[k] || 0;
+        if (n) conDatos++;
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.dataset.dia = k;
+        b.textContent = String(d);
+        var cls = n ? 'libre' : '';
+        if (mir.a === h.a && mir.m === h.m && d === h.d) cls += ' hoy';
+        if (enRango) {
+          if (k === _calPendiente) cls += ' pendiente';
+          if (desde && k === desde) cls += ' sel';
+          else if (desde && k === hasta) cls += ' sel';
+          else if (desde && k > desde && k < hasta) cls += ' enrango';
+        } else if (desde && k === desde) cls += ' sel';
+        b.className = cls;
+        b.title = n
+          ? n + ' movimiento(s) de ' + _ventanaUsuario + ' el ' + diaLegible(k)
+          : 'Sin movimientos el ' + diaLegible(k);
+        if (!n && !enRango) b.disabled = true;
+        calDias.appendChild(b);
+      }
+      calNota.textContent = enRango
+        ? (_calPendiente ? 'Elija el día final (después del ' + diaLegible(_calPendiente) + ')'
+          : (desde ? 'Del ' + diaLegible(desde) + ' al ' + diaLegible(hasta)
+            : 'Pulse el día inicial y luego el final'))
+        : (conDatos ? conDatos + ' día(s) con movimientos' : 'Ningún movimiento en este mes');
+      var atras = mir.m === 0 ? { a: mir.a - 1, m: 11 } : { a: mir.a, m: mir.m - 1 };
+      var adelante = mir.m === 11 ? { a: mir.a + 1, m: 0 } : { a: mir.a, m: mir.m + 1 };
+      calAtras.disabled = !enRango && !hayEnMes(por, atras.a, atras.m);
+      calAdelante.disabled = !enRango && !hayEnMes(por, adelante.a, adelante.m);
+      calAtras.title = enRango ? 'Mes anterior' : 'Mes anterior con movimientos';
+      calAdelante.title = enRango ? 'Mes siguiente' : 'Mes siguiente con movimientos';
+    }
+
+    // Rejilla de los doce meses del año que se está viendo; las flechas cambian de año.
+    function pintarMeses(por) {
+      var a = _calMes ? _calMes.a : hoyito().a;
+      var desde = vCampos.dia.value;
+      var hasta = vCampos.diaHasta.value || desde;
+      var modo = vCampos.modo.value;
+      calTitulo.textContent = String(a);
+      calDias.className = 'cd-dias tres';
+      calDias.innerHTML = '';
+      var conDatos = 0;
+      for (var m = 0; m < 12; m++) {
+        var pref = a + '-' + p(m + 1);
+        var n = totalEn(por, pref);
+        if (n) conDatos++;
+        var ini = pref + '-01';
+        var fin = pref + '-' + p(ultimoDia(a, m));
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.dataset.mes = pref;
+        b.textContent = MESES[m];
+        var cls = n ? 'libre' : '';
+        if (modo === 'rango' && desde && !(fin < desde || ini > hasta)) cls += ' enrango';
+        else if (desde && desde.slice(0, 7) === pref) cls += ' sel';
+        b.className = cls;
+        b.title = n
+          ? n + ' movimiento(s) de ' + _ventanaUsuario + ' en ' + MESES[m] + ' de ' + a
+          : 'Sin movimientos en ' + MESES[m] + ' de ' + a;
+        if (!n) b.disabled = true;
+        calDias.appendChild(b);
+      }
+      calNota.textContent = conDatos
+        ? conDatos + ' mes(es) con movimientos en ' + a
+        : 'Ningún movimiento en ' + a;
+      calAtras.disabled = !hayEnAnio(por, a - 1);
+      calAdelante.disabled = !hayEnAnio(por, a + 1);
+      calAtras.title = 'Año anterior con movimientos';
+      calAdelante.title = 'Año siguiente con movimientos';
+    }
+
+    // Rejilla de los años que el índice conoce. No hace falta flechas: se ven todos de golpe.
+    function pintarAnios(por) {
+      var desde = vCampos.dia.value;
+      var anos = {};
+      Object.keys(por).sort().forEach(function (k) {
+        var a = k.slice(0, 4);
+        anos[a] = (anos[a] || 0) + por[k];
+      });
+      var lista = Object.keys(anos).sort();
+      calDias.className = 'cd-dias cuatro';
+      calDias.innerHTML = '';
+      lista.forEach(function (a) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.dataset.anio = a;
+        b.textContent = a;
+        b.className = 'libre' + (desde && desde.slice(0, 4) === a ? ' sel' : '');
+        b.title = anos[a] + ' movimiento(s) de ' + _ventanaUsuario + ' en ' + a;
+        calDias.appendChild(b);
+      });
+      if (!lista.length) {
+        var vac = document.createElement('button');
+        vac.type = 'button';
+        vac.textContent = '—';
+        vac.disabled = true;
+        calDias.appendChild(vac);
+      }
+      calNota.textContent = lista.length
+        ? 'Años con movimientos: ' + lista.join(', ')
+        : 'Ningún año con movimientos';
+    }
+
+    // Los botones del pie cambian con el modo: los atajos de siempre y, en rango, los tramos rápidos.
+    function pintarBotonesCal() {
+      calBotones.innerHTML = '';
+      if (_calModo === 'anio') {
+        boton(calBotones, 'Este año', function () {
+          var h = hoyito();
+          fijarPeriodo('anio', h.a + '-01-01', h.a + '-12-31');
+        });
+        boton(calBotones, 'Cualquier año', function () { fijarPeriodo('', '', ''); });
+        return;
+      }
+      if (_calModo === 'mes') {
+        boton(calBotones, 'Este mes', function () {
+          var h = hoyito();
+          fijarPeriodo('mes', claveDia(h.a, h.m, 1), claveDia(h.a, h.m, ultimoDia(h.a, h.m)));
+        });
+        boton(calBotones, 'Mes pasado', function () {
+          var h = hoyito();
+          var m = h.m - 1, a = h.a;
+          if (m < 0) { m = 11; a--; }
+          fijarPeriodo('mes', claveDia(a, m, 1), claveDia(a, m, ultimoDia(a, m)));
+        });
+        boton(calBotones, 'Cualquier mes', function () { fijarPeriodo('', '', ''); });
+        return;
+      }
+      if (_calModo === 'rango') {
+        boton(calBotones, '7 días', function () { fijarTras(6); }, 'Los últimos siete días');
+        boton(calBotones, '30 días', function () { fijarTras(29); }, 'Los últimos treinta días');
+        boton(calBotones, 'Todo', function () {
+          var ks = Object.keys(mapaDias()).sort();
+          if (!ks.length) return;
+          fijarPeriodo('rango', ks[0], ks[ks.length - 1]);
+        }, 'Desde su primer movimiento hasta el último');
+        boton(calBotones, 'Cualquier día', function () { fijarPeriodo('', '', ''); });
+        return;
+      }
+      boton(calBotones, 'Hoy', function () {
+        var h = hoyito();
+        fijarPeriodo('dia', claveDia(h.a, h.m, h.d), claveDia(h.a, h.m, h.d));
+      });
+      boton(calBotones, 'Ayer', function () {
+        var d = new Date();
+        d.setDate(d.getDate() - 1);
+        fijarPeriodo('dia', claveDia(d.getFullYear(), d.getMonth(), d.getDate()),
+          claveDia(d.getFullYear(), d.getMonth(), d.getDate()));
+      });
+      boton(calBotones, 'Cualquier día', function () { fijarPeriodo('', '', ''); });
+    }
+
+    function fijarTras(dias) {
+      var fin = new Date();
+      var ini = new Date();
+      ini.setDate(ini.getDate() - dias);
+      fijarPeriodo('rango', claveDia(ini.getFullYear(), ini.getMonth(), ini.getDate()),
+        claveDia(fin.getFullYear(), fin.getMonth(), fin.getDate()));
+    }
+
+    // Un clic basta en Día/Mes/Año; en Rango se pegan dos (el orden no importa, se acomoda solo).
+    function pulsarCal(e) {
+      var b = e.target.closest ? e.target.closest('button') : null;
+      if (!b || b.disabled) return;
+      if (b.dataset.dia) {
+        var k = b.dataset.dia;
+        if (_calModo !== 'rango') { fijarPeriodo('dia', k, k); return; }
+        if (!_calPendiente) { _calPendiente = k; pintarCal(); return; }
+        var a = _calPendiente, z = k;
+        if (z < a) { var t = a; a = z; z = t; }
+        _calPendiente = '';
+        fijarPeriodo('rango', a, z);
+        return;
+      }
+      if (b.dataset.mes) {
+        var pref = b.dataset.mes;
+        var anio = Number(pref.slice(0, 4)), mes = Number(pref.slice(5, 7)) - 1;
+        fijarPeriodo('mes', pref + '-01', pref + '-' + p(ultimoDia(anio, mes)));
+        return;
+      }
+      if (b.dataset.anio) {
+        fijarPeriodo('anio', b.dataset.anio + '-01-01', b.dataset.anio + '-12-31');
+      }
+    }
+
+    // ---- la hoja de horas ----
+    function pintarHoras() {
+      var por = mapaHoras();
+      var enRango = _horaModo === 'rango';
+      var desde = vCampos.hora.value;
+      var hasta = vCampos.horaHasta.value;
+      if (hasta === '') hasta = desde;
+      marcarChip(modosHora, _horaModo);
+      hojaDias.innerHTML = '';
+      var conDatos = 0;
+      for (var hh = 0; hh < 24; hh++) {
+        var k = p(hh);
+        var n = por[k] || 0;
+        if (n) conDatos++;
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.dataset.hora = String(hh);
+        b.textContent = k + ':00';
+        var cls = n ? 'libre' : '';
+        if (enRango) {
+          if (_horaPendiente === hh) cls += ' pendiente';
+          if (desde !== '' && hh === Number(desde)) cls += ' sel';
+          else if (desde !== '' && hh === Number(hasta)) cls += ' sel';
+          else if (desde !== '' && hh > Number(desde) && hh < Number(hasta)) cls += ' enrango';
+        } else if (desde !== '' && hh === Number(desde)) cls += ' sel';
+        b.className = cls;
+        b.title = n
+          ? n + ' movimiento(s) de ' + _ventanaUsuario + ' entre las ' + k + ':00 y las ' + k + ':59'
+          : 'Sin movimientos en la hora de las ' + k + ':00';
+        if (!n && !enRango) b.disabled = true;
+        hojaDias.appendChild(b);
+      }
+      notaHora.textContent = enRango
+        ? (_horaPendiente === null ? 'Elija la hora inicial'
+          : 'Elija la hora final (después de las ' + p(_horaPendiente) + ':00)')
+        : (conDatos ? conDatos + ' hora(s) con movimientos en este periodo'
+          : 'Ningún movimiento en este periodo');
+      botonesHora.innerHTML = '';
+      if (enRango) {
+        boton(botonesHora, 'Todo el día', function () { fijarHora(0, 23); }, 'De las 00:00 a las 23:59');
+        boton(botonesHora, 'Mañana', function () { fijarHora(6, 12); }, 'De las 06:00 a las 12:59');
+        boton(botonesHora, 'Tarde', function () { fijarHora(13, 19); }, 'De las 13:00 a las 19:59');
+      }
+      boton(botonesHora, 'Cualquier hora', function () { fijarHora('', ''); });
+    }
+
+    function pulsarHora(e) {
+      var b = e.target.closest ? e.target.closest('button') : null;
+      if (!b || b.disabled || b.dataset.hora === undefined) return;
+      var hh = Number(b.dataset.hora);
+      if (_horaModo !== 'rango') { fijarHora(hh, hh); return; }
+      if (_horaPendiente === null) { _horaPendiente = hh; pintarHoras(); return; }
+      var a = _horaPendiente, z = hh;
+      if (z < a) { var t = a; a = z; z = t; }
+      _horaPendiente = null;
+      fijarHora(a, z);
+    }
+
+    // ---- abrir, cerrar y colocar las hojas ----
+    // Viven con posición fija dentro del <dialog>: así el `overflow-y:auto` de la ventana no las corta
+    // y caben abiertas hacia arriba cuando el campo quedó pegado al borde inferior.
+    function posicionarHoja(hoja, botonCaja) {
+      if (hoja.hidden) return;
+      var r = botonCaja.getBoundingClientRect();
+      var ancho = hoja.offsetWidth, alto = hoja.offsetHeight;
+      var y;
+      if (window.innerHeight - r.bottom >= alto + 12) y = r.bottom + 8;
+      else if (r.top >= alto + 12) y = r.top - alto - 8;
+      else y = Math.max(8, window.innerHeight - alto - 8);
+      var x = Math.max(8, Math.min(r.left, window.innerWidth - ancho - 8));
+      hoja.style.left = Math.round(x) + 'px';
+      hoja.style.top = Math.round(y) + 'px';
+    }
+
+    function reposicionar() {
+      if (!cal.hidden) posicionarHoja(cal, btnDia);
+      if (!hojaHora.hidden) posicionarHoja(hojaHora, btnHora);
+    }
+
+    function abrirHoja(hoja, botonCaja) {
+      hoja.hidden = false;
+      _hojaAbierta = hoja;
+      _hojaRecienCerrada = false;
+      botonCaja.setAttribute('aria-expanded', 'true');
+      document.addEventListener('pointerdown', fueraDeHoja, true);
+      window.addEventListener('resize', reposicionar);
+      _calForm = ventana.querySelector('.modal-form');
+      if (_calForm) _calForm.addEventListener('scroll', reposicionar);
+    }
+
+    function cerrarHoja(hoja, botonCaja) {
+      if (!hoja.hidden) {
+        hoja.hidden = true;
+        botonCaja.setAttribute('aria-expanded', 'false');
+      }
+      if (_hojaAbierta === hoja) _hojaAbierta = null;
+      if (!_hojaAbierta) {
+        document.removeEventListener('pointerdown', fueraDeHoja, true);
+        window.removeEventListener('resize', reposicionar);
+        if (_calForm) { _calForm.removeEventListener('scroll', reposicionar); _calForm = null; }
+      }
+    }
+
+    function cerrarCal() { cerrarHoja(cal, btnDia); }
+    function cerrarHora() { cerrarHoja(hojaHora, btnHora); }
+
+    function fueraDeHoja(e) {
+      if (!_hojaAbierta) return;
+      if (_hojaAbierta.contains(e.target) || btnDia.contains(e.target) || btnHora.contains(e.target)) return;
+      // Se cierra la hoja y se anota el cierre: la pulsación caía sobre el fondo de la ventana, que de
+      // otra manera se cerraría con ella. La próxima pulsación sí cierra la ventana.
+      cerrarCal();
+      cerrarHora();
+      _hojaRecienCerrada = true;
+    }
+
+    function abrirCal() {
+      cerrarHora();
+      _calModo = vCampos.modo.value || 'dia';
+      _calPendiente = '';
+      var d = vCampos.dia.value;
+      if (d) {
+        var t = d.split('-');
+        _calMes = { a: Number(t[0]), m: Number(t[1]) - 1 };
+      } else {
+        // Sin periodo elegido se abre en el mes más reciente que sí tenga movimientos.
+        var ks = Object.keys(mapaDias()).sort();
+        if (ks.length) {
+          var u = ks[ks.length - 1].split('-');
+          _calMes = { a: Number(u[0]), m: Number(u[1]) - 1 };
+        } else _calMes = { a: hoyito().a, m: hoyito().m };
+      }
+      abrirHoja(cal, btnDia);
+      pintarCal();
+      posicionarHoja(cal, btnDia);
+    }
+
+    function abrirHojaHora() {
+      cerrarCal();
+      var d = vCampos.hora.value, h = vCampos.horaHasta.value;
+      _horaModo = (d !== '' && h !== '' && h !== d) ? 'rango' : 'una';
+      _horaPendiente = null;
+      abrirHoja(hojaHora, btnHora);
+      pintarHoras();
+      posicionarHoja(hojaHora, btnHora);
+    }
+
+    // ‹ › : mes arriba/abajo en Día y Rango, año arriba/abajo en Mes. En Año no hay a dónde saltar.
+    function saltarHoja(n) {
+      if (_calModo === 'anio') return;
+      if (_calModo === 'mes') {
+        _calMes = { a: (_calMes ? _calMes.a : hoyito().a) + n, m: 0 };
+      } else {
+        var mir = _calMes || hoyito();
+        var m = mir.m + n, a = mir.a;
+        if (m < 0) { m = 11; a--; } else if (m > 11) { m = 0; a++; }
+        _calMes = { a: a, m: m };
+      }
+      pintarCal();
+      posicionarHoja(cal, btnDia);
+    }
+
+    // Pone (o quita) el periodo: escribe los campos ocultos, actualiza el rótulo, recorta al instante
+    // lo que ya está en pantalla y vuelve a pedir los renglones de ese recorte —así un mes o un año
+    // viejos no quedan atrapados detrás del tope de los 2.000 más recientes—.
+    function fijarPeriodo(modo, desde, hasta) {
+      vCampos.modo.value = modo || '';
+      vCampos.dia.value = desde || '';
+      vCampos.diaHasta.value = hasta || desde || '';
+      cerrarCal();
+      sincronizarPeriodo();
+      pintarVentana();
+      cargarVentana();
+    }
+
+    function fijarHora(desde, hasta) {
+      vCampos.hora.value = (desde === '' || desde === null || typeof desde === 'undefined') ? '' : String(desde);
+      vCampos.horaHasta.value = vCampos.hora.value === '' ? '' : String(hasta);
+      cerrarHora();
+      sincronizarHora();
+      pintarVentana();
+    }
+
+    function sincronizarPeriodo() {
+      var v = vCampos.dia.value;
+      txtDia.textContent = etiquetaPeriodo();
+      txtDia.className = v ? 'puesto' : 'vacio';
+      btnQuitar.hidden = !v;
+      btnDia.title = v
+        ? 'Periodo: ' + txtDia.textContent + '. Pulse para cambiarlo'
+        : 'Elegir el periodo: un día, un mes, un año o un rango de fechas';
+      if (!cal.hidden) pintarCal();
+    }
+
+    function sincronizarHora() {
+      var v = vCampos.hora.value;
+      txtHora.textContent = etiquetaHora();
+      txtHora.className = v === '' ? 'vacio' : 'puesto';
+      btnQuitarHora.hidden = v === '';
+      btnHora.title = v === ''
+        ? 'Elegir una hora concreta o un rango de horas'
+        : 'Hora: ' + txtHora.textContent + '. Pulse para cambiarla';
+      if (!hojaHora.hidden) pintarHoras();
+    }
+
+    // ---- qué le toca cargar a la ventana ----
+    // Sin periodo se pide la historia completa (como siempre); con periodo se pide solo ese recorte,
+    // en desde..hasta incluidos. `fuerza` es para cuando abre otra ventana y hay que pedir sí o sí.
+    function cargarVentana(fuerza) {
+      var r = rangoVentana();
+      if (!fuerza && r.desde === _cargadoDesde && r.hasta === _cargadoHasta) return Promise.resolve();
+      _cargadoDesde = r.desde;
+      _cargadoHasta = r.hasta;
+      var usuario = _ventanaUsuario;
+      var url = '/api/bitacora/unificada?usuario=' + encodeURIComponent(usuario) + '&limite=2000';
+      if (r.desde) url += '&desde=' + r.desde + '&hasta=' + r.hasta;
+      if (_ventanaPeticion) _ventanaPeticion.abort();
+      var ctl = new AbortController();
+      _ventanaPeticion = ctl;
+      // Mientras contesta se avisa en la ventana: sin el aviso, el recorte nuevo deja la lista vacía
+      // y cualquiera leería «no hay movimientos» donde solo falta la respuesta del servidor.
+      _cargando = true;
+      pintarVentana();
+      return api(url).then(function (data) {
+        if (ctl.signal.aborted || usuario !== _ventanaUsuario) return;
+        _cargando = false;
+        _ventanaTodas = data.movimientos || [];
+        _cargadoDesde = r.desde;
+        _cargadoHasta = r.hasta;
+        rellenarVentana();
+        pintarVentana();
+        if (_ventanaTodas.length >= 2000) {
+          var s = document.createElement('span');
+          s.className = 'corte';
+          s.textContent = r.desde
+            ? '(los 2000 más recientes de este periodo; el Excel los trae todos)'
+            : '(los 2000 más recientes de su historia; el Excel los trae todos)';
+          ventanaResumen.appendChild(s);
+        }
+      }).catch(function (e) {
+        if (ctl.signal.aborted || usuario !== _ventanaUsuario) return;
+        _cargando = false;
+        _cargadoDesde = '';
+        _cargadoHasta = '';
+        _ventanaTodas = [];
+        ventanaResumen.innerHTML = '';
+        ventanaVacio.hidden = false;
+        ventanaVacio.textContent = 'No se pudo cargar la hoja de ' + usuario + ': ' + e.message;
+      });
+    }
+
+    // El índice de días (cuántos renglones dejó cada uno en TODA su historia) es lo que le dice a la
+    // hoja en qué días, meses y años hay historia real. Se pide una sola vez por usuario.
+    function cargarIndice() {
+      var usuario = _ventanaUsuario;
+      if (_indiceUsuario === usuario) return;
+      // Al cambiar de usuario el índice viejo deja de valer: mientras llega el nuevo es mejor no
+      // tener ninguno que prestar la historia de otro y decir «sí tiene movimientos» por error.
+      _indiceDias = {};
+      _indiceUsuario = '';
+      api('/api/bitacora/periodos?usuario=' + encodeURIComponent(usuario))
+        .then(function (d) {
+          if (usuario !== _ventanaUsuario) return;
+          _indiceDias = d.dias || {};
+          _indiceUsuario = usuario;
+          if (!cal.hidden) pintarCal();
+        })
+        .catch(function () { if (usuario === _ventanaUsuario) _indiceDias = {}; });
+    }
+
+    // La dirección también puede traer el periodo ya elegido: ?dia=, ?mes=2026-11, ?anio=2026 o
+    // ?desde=&hasta=. Escribe los tres campos ocultos correspondientes.
+    function periodoDesdeUrl(filtros) {
+      var d = normalizaDia(filtros.dia);
+      if (d) { fijarEnCampos('dia', d, d); return; }
+      var m = normalizaMes(filtros.mes);
+      if (m) {
+        fijarEnCampos('mes', m + '-01', m + '-' + p(ultimoDia(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1)));
+        return;
+      }
+      var a = normalizaAnio(filtros.anio);
+      if (a) { fijarEnCampos('anio', a + '-01-01', a + '-12-31'); return; }
+      var ini = normalizaDia(filtros.desde), fin = normalizaDia(filtros.hasta);
+      if (ini || fin) fijarEnCampos('rango', ini || fin, fin || ini);
+    }
+
+    function fijarEnCampos(modo, desde, hasta) {
+      vCampos.modo.value = modo;
+      vCampos.dia.value = desde;
+      vCampos.diaHasta.value = hasta;
+    }
+
+    // Cerrar la ventana quita la marca de la fila. Se llama desde el botón, desde el fondo y desde el
+    // evento `close` (que es el que dispara la tecla Esc); los tres caminos son idempotentes por si el
+    // navegador no llega a soltar el evento.
+    function cerrarVentana() {
+      _ventanaUsuario = '';
+      _hojaRecienCerrada = false;
+      cerrarCal();
+      cerrarHora();
+      if (_ventanaPeticion) { _ventanaPeticion.abort(); _ventanaPeticion = null; }
+      marcarFilaUsuario('');
+    }
+
+    // Los desplegables de la ventana salen de lo que ese usuario sí tiene, para no ofrecer vacíos. La
+    // hora ya no es un desplegable: es su propia hoja (y ofrece las horas del periodo que se está
+    // viendo), así que aquí solo queda la lista de actividades.
+    function rellenarVentana() {
+      var nombres = {};
+      _ventanaTodas.forEach(function (m) { if (m.actividad) nombres[m.actividad] = true; });
+      var act = vCampos.actividad;
+      var previo = act.value;
+      act.innerHTML = '<option value="">Todas</option>';
+      Object.keys(nombres).sort().forEach(function (x) {
+        var op = document.createElement('option');
+        op.value = x; op.textContent = x;
+        act.appendChild(op);
+      });
+      act.value = previo;
+      if (act.value !== previo) { act.value = ''; pintarVentana(); }
+    }
+
+    // El Excel lleva exactamente el recorte que se está viendo: el periodo como desde..hasta (los dos
+    // días incluidos, sea un día suelto, un mes, un año o un rango) y la hora como hora..horaHasta.
+    function urlExportVentana() {
+      var q = ['usuario=' + encodeURIComponent(_ventanaUsuario)];
+      function add(k, v) { if (v) q.push(k + '=' + encodeURIComponent(v)); }
+      var r = rangoVentana();
+      add('desde', r.desde);
+      add('hasta', r.hasta);
+      add('hora', vCampos.hora.value);
+      add('horaHasta', vCampos.horaHasta.value);
+      add('actividad', vCampos.actividad.value);
+      add('fuente', vCampos.fuente.value);
+      add('texto', vCampos.texto.value);
+      add('lote', _ventanaLote);
+      return '/api/bitacora/unificada/export?' + q.join('&');
+    }
+
+    // Clic en un usuario: abre la ventana con sus movimientos. `filtros` (dia, mes, anio, desde, hasta,
+    // hora, horaHasta, actividad, fuente, texto, lote) es opcional y solo lo usa el enlace directo de
+    // la dirección.
+    function abrirUsuario(usuario, filtros) {
+      if (!ventana || typeof ventana.showModal !== 'function') {
+        var aviso = document.getElementById('vacioUsuarios');
+        aviso.hidden = false;
+        aviso.textContent = 'Este navegador no abre ventanas emergentes; se necesita uno actual para ver la hoja de un usuario.';
+        return;
+      }
+      _ventanaUsuario = usuario;
+      _ventanaLote = '';
+      _calMes = null;
+      _calPendiente = '';
+      _horaPendiente = null;
+      cerrarCal();
+      cerrarHora();
+      Object.keys(vCampos).forEach(function (k) { vCampos[k].value = ''; });
+      _cargadoDesde = '';
+      _cargadoHasta = '';
+      _cargando = false;
+      if (filtros) {
+        ['actividad', 'fuente', 'texto'].forEach(function (k) {
+          if (filtros[k]) vCampos[k].value = filtros[k];
+        });
+        _ventanaLote = filtros.lote || '';
+        periodoDesdeUrl(filtros);
+        var hi = filtros.hora !== undefined && filtros.hora !== '' ? Number(filtros.hora) : NaN;
+        var hf = filtros.horaHasta !== undefined && filtros.horaHasta !== '' ? Number(filtros.horaHasta) : NaN;
+        if (isNaN(hi) && !isNaN(hf)) hi = hf;
+        if (!isNaN(hi) && hi >= 0 && hi <= 23) {
+          vCampos.hora.value = String(hi);
+          vCampos.horaHasta.value = (!isNaN(hf) && hf > hi) ? String(hf) : '';
+        }
+      }
+      document.getElementById('ventanaTitulo').textContent = 'Movimientos de ' + usuario;
+      document.getElementById('ventanaSub').textContent =
+        'Todo lo que hizo en la intranet y en el quemador DICOM, mezclado por hora. ' +
+        'Aquí abajo puedes recortarlo por periodo —un día, un mes, un año o un rango—, por hora, ' +
+        'por actividad, por bitácora o por texto.';
+      ventanaCuerpo.innerHTML = '';
+      ventanaResumen.textContent = '';
+      var avisoCarga = document.createElement('span');
+      avisoCarga.className = 'aviso-cargando';
+      avisoCarga.textContent = 'Cargando los movimientos de ' + usuario + '…';
+      ventanaResumen.appendChild(avisoCarga);
+      ventanaVacio.hidden = true;
+      if (ventana.open) ventana.close();   // veniría abierta de otro usuario: showModal no lo permite
+      ventana.showModal();
+      marcarFilaUsuario(usuario);
+      sincronizarPeriodo();
+      sincronizarHora();
+      // Primero el índice de días (es el que dice en qué meses y años hay historia) y encima los
+      // renglones del recorte que traiga la dirección.
+      cargarIndice();
+      cargarVentana(true);
+    }
+
+    function momentoCorto(iso) {
+      if (!iso) return 'Nunca';
+      var d = new Date(iso);
+      if (isNaN(d)) return 'Nunca';
+      return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() +
+        ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
+
+    function pintarDonde(celda, d) {
+      celda.innerHTML = '';
+      var partes = [];
+      if (d.equipo) partes.push({ txt: d.equipo, cls: 'eq' });
+      if (d.ip) partes.push({ txt: d.ip, cls: 'mono' });
+      if (d.ubicacion) partes.push({ txt: d.ubicacion });
+      if (d.fuenteUbicacion) {
+        var metro = Number(d.precisionMetros || 0);
+        partes.push({
+          txt: d.fuenteUbicacion + (metro > 0 ? ' (±' + metro + ' m)' : ''),
+          cls: d.fuenteUbicacion.indexOf('real') >= 0 ? 'fuente real' : 'fuente'
+        });
+      }
+      if (!partes.length) { celda.textContent = 'sin datos de red'; return; }
+      partes.forEach(function (x, i) {
+        if (i) celda.appendChild(document.createTextNode(' · '));
+        var sp = document.createElement('span');
+        if (x.cls) sp.className = x.cls;
+        sp.textContent = x.txt;
+        celda.appendChild(sp);
+      });
+    }
+
+    // La tarjeta es hoy lo único que hay en la página, así que se las arregla para llenarse también
+    // cuando quien entra solo tiene permiso del quemador: `/resumen` le contesta 403 y entonces la
+    // lista se arma con los renglones del mostrador (que sí puede ver), cambiando los rótulos para no
+    // prometer datos de conexión que no le pertenecen.
+    function pintarUsuarios(lista, desdeQuemador) {
+      var tb = document.getElementById('cuerpoUsuarios');
+      tb.innerHTML = '';
+      _filasUsuario = {};
+      var vacioU = document.getElementById('vacioUsuarios');
+      vacioU.hidden = lista.length > 0;
+      if (!lista.length) {
+        vacioU.textContent = desdeQuemador
+          ? 'No hay movimientos del quemador registrados todavía.'
+          : 'No hay usuarios con actividad registrada.';
+      }
+      if (desdeQuemador) {
+        document.getElementById('thEstado').textContent = 'Registros';
+        document.getElementById('thUltimo').textContent = 'Último movimiento';
+      }
+      lista.forEach(function (u) {
+        var tr = document.createElement('tr');
+        tr.className = 'fila-usuario';
+        tr.innerHTML = '<td></td><td></td><td class="momento-usuario"></td><td class="donde-cel"></td><td class="donde-cel"></td>';
+        tr.children[0].textContent = u.usuario;
+        if (desdeQuemador) {
+          tr.children[1].textContent = (u.total || 0) + ' movimiento(s)';
+          tr.children[2].textContent = u.ultimo || 'Nunca';
+        } else {
+          var st = document.createElement('code');
+          st.className = 'estado' + (u.conectado ? '' : ' desconectado');
+          st.textContent = u.conectado ? 'Conectado' : 'Desconectado';
+          tr.children[1].appendChild(st);
+          tr.children[2].textContent = momentoCorto(u.ultimoAcceso || u.ultimaActividad);
+        }
+        pintarDonde(tr.children[3], u);
+        tr.children[4].textContent = u.dispositivo || '—';
+        _filasUsuario[u.usuario] = tr;
+        tr.addEventListener('click', function () { abrirUsuario(u.usuario); });
+        tb.appendChild(tr);
+      });
+      // Si la ventana ya está abierta (o se abrió desde el enlace), su fila se marca al repintar la lista.
+      marcarFilaUsuario(_ventanaUsuario);
+    }
+
+    function cargarResumen() {
+      return api('/api/bitacora/resumen').then(function (lista) {
+        pintarUsuarios(lista, false);
+      }).catch(function () {
+        return api('/api/bitacora/unificada?limite=2000').then(function (data) {
+          var por = {};
+          (data.movimientos || []).forEach(function (m) {
+            var u = m.usuario || '(sin usuario)';
+            if (!por[u]) por[u] = { usuario: u, total: 0, ultimo: null };
+            por[u].total++;
+            if (!por[u].ultimo || String(m.momento || '') > String(por[u].ultimo.momento || '')) por[u].ultimo = m;
+          });
+          var lista = Object.keys(por).sort().map(function (k) {
+            var g = por[k], m = g.ultimo || {};
+            return {
+              usuario: k, total: g.total, ultimo: m.fecha ? (m.fecha + ' ' + (m.hora || '')) : 'Nunca',
+              equipo: m.equipo, ip: m.ip, ubicacion: m.ubicacion,
+              fuenteUbicacion: m.fuenteUbicacion, precisionMetros: m.precisionMetros,
+              dispositivo: m.dispositivo
+            };
+          });
+          pintarUsuarios(lista, true);
+        }).catch(function () {
+          document.getElementById('seccionUsuarios').hidden = true;
+        });
+      });
+    }
+
+    function cargarEstadoUbicacion() {
+      var caja = document.getElementById('estadoUbicacion');
+      return api('/api/bitacora/ubicacion-estado').then(function (e) {
+        caja.textContent = e.seguro
+          ? 'De ' + (e.total || 0) + ' equipo(s) visto(s) en la red: ' + (e.conPosicionReal || 0) +
+            ' dan su posición real con el permiso del navegador, ' + (e.conPuntoAprendido || 0) +
+            ' heredan el punto real de algún equipo de su mismo rango de IP, ' + (e.conDireccionEscrita || 0) +
+            ' tienen dirección escrita para su rango y ' + (e.sinConfirmar || 0) +
+            ' salen «Sin confirmar». Cuando un puesto aparece sin confirmar es porque nadie de su rango ha '
+            + 'aceptado todavía el permiso de ubicación: se abre la intranet en https://…:' + e.puerto +
+            ', se acepta el permiso una sola vez y la columna se llena sola (y con ella los movimientos viejos).'
+          : 'La intranet todavía no se abre en dirección segura (https), así que el navegador no puede '
+            + 'entregar la posición real de los aparatos y la columna sale «Sin confirmar» hasta que se abra por https.';
+      }).catch(function () { caja.textContent = ''; });
+    }
+
+    // ---- Arranque: la dirección también puede pedir una ventana ya abierta ----
+    // /admin/bitacora/index.html?usuario=root abre la ventana de root, y la antigua pantalla del
+    // quemador manda ?fuente=quemador con el día, el lote o el texto que trajera: esos filtros pasan
+    // a la ventana. El periodo se puede pedir además por ?mes=2026-11, ?anio=2026 o ?desde=&hasta=.
+    // Sin `usuario` no hay ventana que abrir y la página queda en la lista de siempre.
+    var entrada = new URLSearchParams(window.location.search);
+    var _pendienteUsuario = entrada.get('usuario') || '';
+    var filtrosUrl = {};
+    ['dia', 'mes', 'anio', 'desde', 'hasta', 'hora', 'horaHasta', 'actividad', 'fuente', 'texto', 'lote']
+      .forEach(function (k) { if (entrada.get(k)) filtrosUrl[k] = entrada.get(k); });
+
+    // ---- Filtros de la ventana del usuario ----
+    // Periodo: la caja abre su hoja (Día / Mes / Año / Rango) y la hoja escribe en los campos ocultos.
+    btnDia.addEventListener('click', function () {
+      if (cal.hidden) abrirCal(); else cerrarCal();
+    });
+    btnQuitar.addEventListener('click', function () { fijarPeriodo('', '', ''); });
+    calModos.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('button[data-modo]') : null;
+      if (!b) return;
+      _calModo = b.dataset.modo;
+      _calPendiente = '';
+      pintarCal();
+      posicionarHoja(cal, btnDia);
+    });
+    calAtras.addEventListener('click', function () { saltarHoja(-1); });
+    calAdelante.addEventListener('click', function () { saltarHoja(1); });
+    calDias.addEventListener('click', pulsarCal);
+
+    // Hora: lo mismo con su propia hoja, una hora suelta o un rango de horas.
+    btnHora.addEventListener('click', function () {
+      if (hojaHora.hidden) abrirHojaHora(); else cerrarHora();
+    });
+    btnQuitarHora.addEventListener('click', function () { fijarHora('', ''); });
+    modosHora.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('button[data-hmodo]') : null;
+      if (!b) return;
+      _horaModo = b.dataset.hmodo;
+      _horaPendiente = null;
+      pintarHoras();
+      posicionarHoja(hojaHora, btnHora);
+    });
+    hojaDias.addEventListener('click', pulsarHora);
+
+    [vCampos.actividad, vCampos.fuente].forEach(function (el) {
+      el.addEventListener('change', pintarVentana);
+    });
+    vCampos.texto.addEventListener('input', function () {
+      clearTimeout(vCampos.texto._t);
+      vCampos.texto._t = setTimeout(pintarVentana, 180);
+    });
+    document.getElementById('ventanaLimpiar').addEventListener('click', function () {
+      cerrarCal();
+      cerrarHora();
+      Object.keys(vCampos).forEach(function (k) { vCampos[k].value = ''; });
+      _ventanaLote = '';
+      sincronizarPeriodo();
+      sincronizarHora();
+      pintarVentana();
+      // Sin periodo la ventana vuelve a su historia completa; si estaba recortada, hay que volverla a pedir.
+      cargarVentana();
+    });
+    document.getElementById('ventanaExcel').addEventListener('click', function () {
+      window.location.href = urlExportVentana();
+    });
+    document.getElementById('ventanaCerrar').addEventListener('click', function () {
+      ventana.close();
+      cerrarVentana();
+    });
+    // Clic fuera de la tarjeta (en el fondo oscuro) también la cierra; si lo que estaba abierto era una
+    // de las hojas, esa primera pulsación se quedó en ella.
+    ventana.addEventListener('click', function (e) {
+      if (e.target !== ventana) return;
+      if (_hojaRecienCerrada) { _hojaRecienCerrada = false; return; }
+      ventana.close();
+      cerrarVentana();
+    });
+    // Esc (y cualquier otro cierre) cae aquí: la fila deja de estar marcada.
+    ventana.addEventListener('close', cerrarVentana);
+    // Con una hoja abierta, la primera Esc la cierra a ella; la ventana se cierra con la segunda.
+    ventana.addEventListener('cancel', function (e) {
+      if (!cal.hidden || !hojaHora.hidden) { e.preventDefault(); cerrarCal(); cerrarHora(); }
+    });
+
+    function nombreRol(rol) {
+      if (!rol) return '(sin rol)';
+      if (String(rol).toLowerCase() === 'admin') return 'Administrador';
+      if (String(rol).toLowerCase() === 'ingeniero') return 'Ingeniero';
+      return rol;
+    }
+    fetch('/api/patologia/me', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
+      .then(function (me) { document.getElementById('badgeUsuario').textContent = me.usuario + ' · ' + nombreRol(me.rol); })
+      .catch(function () { document.getElementById('badgeUsuario').textContent = ''; });
+
+    cargarEstadoUbicacion();
+    // Primero la lista; si la dirección traía usuario, su ventana se abre cuando la lista ya está pintada
+    // para que la fila salga marcada desde el principio.
+    cargarResumen().then(function () {
+      if (_pendienteUsuario) abrirUsuario(_pendienteUsuario, filtrosUrl);
+    });
+  })();
+  </script>
+<script src="/js/ubicacion.js"></script>
+</body>
+</html>

@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <script src="/js/theme.js?v=20261119e"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Roles y permisos — Intranet meditechnosys</title>
+  <link rel="stylesheet" href="/css/panel.css?v=20261123a" />
+  <style>
+    .nota { border: 1px solid var(--borde); background: var(--panel-2); border-radius: 6px; padding: 10px 14px; margin: 0 0 16px; font-size: .88rem; color: var(--suave); }
+    .nota a { color: var(--azul); font-weight: 600; }
+    .guardar-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 0 0 14px; }
+    .aviso-ok { border: 1px solid var(--ok); background: rgba(34,197,94,.12); color: #052e16; border-radius: 6px; padding: 8px 12px; font-size: .85rem; margin: 0 0 12px; }
+    .aviso-ok[hidden] { display: none; }
+    .roles-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin: 0 0 14px; }
+    .roles-bar label { display: flex; flex-direction: column; gap: 4px; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); }
+    .roles-bar select { min-width: 220px; }
+    .chip-sistema { font-size: .72rem; border: 1px solid var(--borde); border-radius: 10px; padding: 1px 8px; color: var(--suave); }
+    /* ---- Acordeón de permisos ---- */
+    .perm-buscar { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
+    .perm-buscar input { flex: 1; }
+    .perm-grupo-sec {
+      border: 1px solid var(--borde); border-radius: 6px; background: var(--panel-2);
+      margin-bottom: 8px; overflow: hidden;
+    }
+    .perm-grupo-cab {
+      padding: 10px 14px; display: flex; align-items: center; gap: 10px; cursor: pointer;
+      font-weight: 600; font-size: 13px; color: var(--texto); border-bottom: 1px solid var(--borde);
+    }
+    .perm-grupo-cab:hover { background: var(--row-hover); }
+    .perm-grupo-cab::before {
+      content: "▶"; display: inline-block; width: 12px; font-size: 10px; transition: transform 0.2s;
+    }
+    .perm-grupo-sec.abierto .perm-grupo-cab::before { transform: rotate(90deg); }
+    .perm-grupo-cab .perm-count { font-size: 11px; color: var(--suave); margin-left: auto; }
+    .perm-grupo-body { display: none; padding: 10px 14px; }
+    .perm-grupo-sec.abierto .perm-grupo-body { display: block; }
+    .perm-fila {
+      display: flex; align-items: flex-start; gap: 12px; padding: 6px 0;
+      border-bottom: 1px solid var(--borde);
+    }
+    .perm-fila:last-child { border-bottom: none; }
+    .perm-check {
+      flex: 0 0 auto; margin-top: 2px;
+      width: 18px; height: 18px; cursor: pointer; accent-color: var(--azul);
+    }
+    .perm-nombre { flex: 1; min-width: 0; }
+    .perm-clave { font-family: Consolas, monospace; font-size: 11px; color: var(--suave); }
+    .perm-desc { font-size: 12px; color: var(--texto); margin-top: 2px; }
+  </style>
+  <link rel="stylesheet" href="/css/theme.css?v=20261120f" />
+</head>
+<body class="theme-panel">
+  <header>
+    <h1>Roles y permisos</h1>
+    <div class="logo-centro">Meditechnosys<span>Medical Technology Solutions</span></div>
+    <span class="badge" id="badgeUsuario">…</span>
+    <div class="botones-nav">
+      <button class="boton-nav" onclick="window.location.href='/'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Regresar
+      </button>
+      <button class="boton-nav" onclick="window.location.href='/'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Home
+      </button>
+    </div>
+  </header>
+  <div class="fondo-logo" aria-hidden="true"></div>
+
+  <main class="page-wide">
+    <section class="card">
+      <h2>Roles</h2>
+      <p class="nota">
+        Crea los roles que necesites con nombre libre, define <strong>qué puede hacer cada uno</strong> y
+        ajústalos por persona en <a href="/admin/usuarios/index.html">Gestión de usuarios</a>. Los roles
+        <strong>Administrador</strong> e <strong>Ingeniero</strong> vienen con el sistema: no se pueden borrar
+        ni renombrar, pero sí cambiar sus permisos.
+      </p>
+      <p class="aviso-ok" id="avisoOk" role="status" hidden></p>
+      <p class="form-error" id="error" role="alert" hidden></p>
+
+      <div class="roles-bar">
+        <label>Rol seleccionado
+          <select id="selRol"></select>
+        </label>
+        <button class="btn-primary" id="btnNuevo">+ Nuevo rol</button>
+        <button class="btn-secondary" id="btnRenombrar">Renombrar</button>
+        <button class="btn-danger" id="btnEliminar">Eliminar</button>
+        <span class="chip-sistema" id="chipRol" hidden>Rol del sistema</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Permisos del rol <span id="tituloRol" style="text-transform:none;letter-spacing:0"></span></h2>
+      <div class="guardar-bar">
+        <button class="btn-primary" id="btnGuardar">Guardar permisos</button>
+        <span class="hint">El rol Administrador siempre conserva el permiso de administrar roles para no quedar bloqueado fuera de esta página.</span>
+      </div>
+      <div class="perm-buscar">
+        <input type="search" id="permBusqueda" placeholder="Buscar permiso…">
+        <button type="button" id="permExpandirTodo" class="btn-secondary btn-mini">Expandir todo</button>
+        <button type="button" id="permColapsarTodo" class="btn-secondary btn-mini">Colapsar todo</button>
+      </div>
+      <div id="cuerpo"></div>
+    </section>
+  </main>
+
+  <script src="/js/gestion.js?v=20261123a"></script>
+  <script>
+  (function () {
+    'use strict';
+    var cuerpo = document.getElementById('cuerpo');
+    var error = document.getElementById('error');
+    var avisoOk = document.getElementById('avisoOk');
+    var selRol = document.getElementById('selRol');
+    var chipRol = document.getElementById('chipRol');
+    var tituloRol = document.getElementById('tituloRol');
+    var grupos = [];
+    var roles = [];       // [{ nombre, esSistema, creado }]
+    var matriz = {};      // { rol: [claves] }
+    var rolActual = null;
+    var permFilas = [];   // para filtrar
+
+    function ok(msg) { avisoOk.textContent = msg; avisoOk.hidden = false; Gestion.sinError(error); }
+    function rolInfo(nombre) { for (var i = 0; i < roles.length; i++) if (roles[i].nombre === nombre) return roles[i]; return null; }
+
+    function pintarMatriz() {
+      cuerpo.innerHTML = '';
+      permFilas = [];
+      var concedidos = matriz[rolActual] || [];
+      var esAdminRol = String(rolActual).toLowerCase() === 'admin';
+      grupos.forEach(function (g) {
+        var sec = document.createElement('div');
+        sec.className = 'perm-grupo-sec';
+        var cab = document.createElement('div');
+        cab.className = 'perm-grupo-cab';
+        cab.textContent = g.nombre;
+        var count = document.createElement('span');
+        count.className = 'perm-count';
+        count.textContent = (g.permisos || []).length + ' permiso(s)';
+        cab.appendChild(count);
+        cab.addEventListener('click', function () { sec.classList.toggle('abierto'); });
+        sec.appendChild(cab);
+        var body = document.createElement('div');
+        body.className = 'perm-grupo-body';
+        (g.permisos || []).forEach(function (p) {
+          var fila = document.createElement('div');
+          fila.className = 'perm-fila';
+          fila.dataset.clave = p.clave;
+          fila.dataset.busqueda = (g.nombre + ' ' + p.clave + ' ' + p.descripcion).toLowerCase();
+
+          var chk = document.createElement('input');
+          chk.type = 'checkbox';
+          chk.className = 'perm-check';
+          chk.dataset.clave = p.clave;
+          chk.checked = concedidos.indexOf(p.clave) >= 0;
+          if (esAdminRol && p.clave === 'roles.administrar') {
+            chk.disabled = true;
+            chk.checked = true;
+            chk.title = 'El Administrador siempre conserva este permiso.';
+          }
+
+          var nom = document.createElement('div');
+          nom.className = 'perm-nombre';
+          nom.innerHTML = '<div class="perm-clave">' + Gestion.esc(p.clave) + '</div>' +
+                          '<div class="perm-desc">' + Gestion.esc(p.descripcion) + '</div>';
+
+          fila.appendChild(chk); fila.appendChild(nom);
+          body.appendChild(fila);
+          permFilas.push(fila);
+        });
+        sec.appendChild(body);
+        cuerpo.appendChild(sec);
+      });
+    }
+
+    function seleccionar(nombre) {
+      rolActual = nombre;
+      selRol.value = nombre;
+      var info = rolInfo(nombre);
+      tituloRol.textContent = '· ' + Gestion.nombreRol(nombre);
+      chipRol.hidden = !(info && info.esSistema);
+      var puedeEditar = Gestion.tiene('roles.administrar');
+      document.getElementById('btnGuardar').disabled = !puedeEditar;
+      document.getElementById('btnNuevo').disabled = !puedeEditar;
+      document.getElementById('btnRenombrar').disabled = !puedeEditar || !!(info && info.esSistema);
+      document.getElementById('btnEliminar').disabled = !puedeEditar || !!(info && info.esSistema);
+      pintarMatriz();
+    }
+
+    function pintarSelect() {
+      selRol.innerHTML = '';
+      roles.forEach(function (r) {
+        var op = document.createElement('option');
+        op.value = r.nombre; op.textContent = Gestion.nombreRol(r.nombre);
+        selRol.appendChild(op);
+      });
+    }
+
+    function cargar(keepRol) {
+      return Gestion.api('/api/roles').then(function (data) {
+        grupos = data.grupos || [];
+        roles = data.roles || [];
+        matriz = data.matriz || {};
+        pintarSelect();
+        var objetivo = (keepRol && rolInfo(keepRol)) ? keepRol : (roles.length ? roles[0].nombre : null);
+        if (objetivo) seleccionar(objetivo);
+      });
+    }
+
+    selRol.addEventListener('change', function () { seleccionar(selRol.value); });
+
+    // ---- buscador de permisos ----
+    document.getElementById('permBusqueda').addEventListener('input', function () {
+      var q = this.value.trim().toLowerCase();
+      permFilas.forEach(function (fila) {
+        var match = !q || fila.dataset.busqueda.indexOf(q) >= 0;
+        fila.style.display = match ? '' : 'none';
+        if (match) fila.closest('.perm-grupo-sec').classList.add('abierto');
+      });
+    });
+
+    // ---- expandir / colapsar todo ----
+    document.getElementById('permExpandirTodo').addEventListener('click', function () {
+      document.querySelectorAll('.perm-grupo-sec').forEach(function (s) { s.classList.add('abierto'); });
+    });
+    document.getElementById('permColapsarTodo').addEventListener('click', function () {
+      document.querySelectorAll('.perm-grupo-sec').forEach(function (s) { s.classList.remove('abierto'); });
+    });
+
+    document.getElementById('btnGuardar').addEventListener('click', function () {
+      var boton = this;
+      Gestion.sinError(error); avisoOk.hidden = true;
+      var claves = [];
+      cuerpo.querySelectorAll('.perm-check:not(:disabled)').forEach(function (cb) { if (cb.checked) claves.push(cb.dataset.clave); });
+      boton.disabled = true;
+      Gestion.api('/api/roles', { method: 'PUT', body: JSON.stringify({ rol: rolActual, permisos: claves }) })
+        .then(function () { ok('Permisos de ' + Gestion.nombreRol(rolActual) + ' guardados.'); })
+        .catch(function (e) { Gestion.error(error, e.message); })
+        .finally(function () { boton.disabled = false; });
+    });
+
+    document.getElementById('btnNuevo').addEventListener('click', function () {
+      var nombre = window.prompt('Nombre del nuevo rol (2 a 20 caracteres: letras, números, espacio, punto, guion o guion bajo):');
+      if (nombre == null) return;
+      nombre = nombre.trim();
+      if (!nombre) return;
+      Gestion.sinError(error); avisoOk.hidden = true;
+      Gestion.api('/api/roles', { method: 'POST', body: JSON.stringify({ nombre: nombre }) })
+        .then(function () { return cargar(nombre); })
+        .then(function () { ok('Rol "' + nombre + '" creado. Ahora asígnale permisos.'); })
+        .catch(function (e) { Gestion.error(error, e.message); });
+    });
+
+    document.getElementById('btnRenombrar').addEventListener('click', function () {
+      var info = rolInfo(rolActual);
+      if (!info || info.esSistema) { Gestion.error(error, 'Los roles del sistema no se pueden renombrar.'); return; }
+      var nuevo = window.prompt('Nuevo nombre para el rol "' + rolActual + '":', rolActual);
+      if (nuevo == null) return;
+      nuevo = nuevo.trim();
+      if (!nuevo || nuevo === rolActual) return;
+      Gestion.sinError(error); avisoOk.hidden = true;
+      Gestion.api('/api/roles/' + encodeURIComponent(rolActual) + '/renombrar', { method: 'PUT', body: JSON.stringify({ nombre: nuevo }) })
+        .then(function () { return cargar(nuevo); })
+        .then(function () { ok('Rol renombrado a "' + nuevo + '".'); })
+        .catch(function (e) { Gestion.error(error, e.message); });
+    });
+
+    document.getElementById('btnEliminar').addEventListener('click', function () {
+      var info = rolInfo(rolActual);
+      if (!info || info.esSistema) { Gestion.error(error, 'Los roles del sistema no se pueden eliminar.'); return; }
+      if (!window.confirm('¿Eliminar el rol "' + rolActual + '"? Solo se puede si ningún usuario lo tiene asignado.')) return;
+      Gestion.sinError(error); avisoOk.hidden = true;
+      Gestion.api('/api/roles/' + encodeURIComponent(rolActual), { method: 'DELETE' })
+        .then(function () { return cargar(null); })
+        .then(function () { ok('Rol "' + info.nombre + '" eliminado.'); })
+        .catch(function (e) { Gestion.error(error, e.message); });
+    });
+
+    Gestion.init().then(function () {
+      document.getElementById('badgeUsuario').textContent = Gestion.YO + ' · ' + Gestion.nombreRol(Gestion.ROL);
+      if (!Gestion.tiene('roles.administrar')) {
+        Gestion.error(error, 'Tu cuenta no tiene permiso para administrar roles y permisos.');
+      }
+      return cargar(null);
+    }).catch(function (e) { Gestion.error(error, 'No se pudo cargar la página: ' + e.message); });
+  })();
+  </script>
+<script src="/js/ubicacion.js"></script>
+</body>
+</html>

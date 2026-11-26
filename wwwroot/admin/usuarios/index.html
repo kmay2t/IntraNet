@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <script src="/js/theme.js?v=20261119e"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gestión de usuarios — Intranet meditechnosys</title>
+  <link rel="stylesheet" href="/css/panel.css?v=20261123a" />
+  <style>
+    .col-acc { text-align: right; white-space: nowrap; }
+    .col-acc button + button { margin-left: 6px; }
+    code.estado { font-family: Consolas, monospace; font-size: .8rem; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--ok); color: #052e16; background: rgba(34,197,94,.12); }
+    code.estado.inactivo { border-color: var(--warn); color: #7c2d12; background: rgba(245,158,11,.14); }
+    .store-line { font-size: .8rem; color: var(--muted); margin: 0 0 12px; }
+    .store-line code { color: var(--dorado-t); }
+    .aviso { border: 1px solid var(--warn); background: rgba(245,158,11,.1); border-radius: 6px; padding: 10px 14px; margin: 0 0 14px; font-size: .88rem; }
+    .modal-alto { max-height: 84vh; overflow: auto; }
+    .col-centro { text-align: center; }
+    .ef-si { color: #052e16; background: rgba(34,197,94,.14); border: 1px solid var(--ok); border-radius: 10px; padding: 1px 8px; font-size: .78rem; }
+    .ef-no { color: var(--suave); border: 1px solid var(--borde); border-radius: 10px; padding: 1px 8px; font-size: .78rem; }
+    /* ---- Ventana de permisos ----
+       Diseño acordeón: secciones colapsables por grupo, checkboxes de 3 estados. */
+    dialog.modal.permisos { max-width: min(960px, calc(100% - 24px)); }
+    .perm-buscar { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
+    .perm-buscar input { flex: 1; }
+    .perm-grupo-sec {
+      border: 1px solid var(--borde); border-radius: 6px; background: var(--panel-2);
+      margin-bottom: 8px; overflow: hidden;
+    }
+    .perm-grupo-cab {
+      padding: 10px 14px; display: flex; align-items: center; gap: 10px; cursor: pointer;
+      font-weight: 600; font-size: 13px; color: var(--texto); border-bottom: 1px solid var(--borde);
+    }
+    .perm-grupo-cab:hover { background: var(--row-hover); }
+    .perm-grupo-cab::before {
+      content: "▶"; display: inline-block; width: 12px; font-size: 10px; transition: transform 0.2s;
+    }
+    .perm-grupo-sec.abierto .perm-grupo-cab::before { transform: rotate(90deg); }
+    .perm-grupo-cab .perm-count { font-size: 11px; color: var(--suave); margin-left: auto; }
+    .perm-grupo-body { display: none; padding: 10px 14px; }
+    .perm-grupo-sec.abierto .perm-grupo-body { display: block; }
+    .perm-fila {
+      display: flex; align-items: flex-start; gap: 12px; padding: 6px 0;
+      border-bottom: 1px solid var(--borde);
+    }
+    .perm-fila:last-child { border-bottom: none; }
+    .perm-check {
+      flex: 0 0 auto; margin-top: 2px;
+      width: 18px; height: 18px; cursor: pointer; accent-color: var(--azul);
+    }
+    .perm-check:indeterminate { appearance: none; border: 2px solid var(--borde); border-radius: 3px;
+      background: var(--panel); position: relative; }
+    .perm-check:indeterminate::after {
+      content: ""; position: absolute; top: 3px; left: 3px; right: 3px; height: 6px;
+      background: var(--azul); border-radius: 1px;
+    }
+    .perm-nombre { flex: 1; min-width: 0; }
+    .perm-clave { font-family: Consolas, monospace; font-size: 11px; color: var(--suave); }
+    .perm-desc { font-size: 12px; color: var(--texto); margin-top: 2px; }
+    .perm-etq { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); }
+    .perm-estado { font-size: 11px; margin-left: auto; white-space: nowrap; }
+    .perm-estado span { display: inline-block; padding: 2px 6px; border-radius: 999px; font-size: 10px; }
+    .perm-estado .heredado { background: var(--panel-2); color: var(--suave); border: 1px solid var(--borde); }
+    .perm-estado .si { background: var(--ok); color: #052e16; }
+    .perm-estado .no { background: var(--err); color: #fff; }
+    #permCuerpo > :first-child { border-top: 0; }
+    .perm-c { display: grid; justify-items: center; gap: 3px; min-width: 0; }
+    .perm-c select.perm-select { width: 100%; min-width: 0; }
+    .perm-etq { display: none; font-size: .62rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--suave); }
+    @media (max-width: 760px) {
+      .perm-cab { display: none; }
+      .perm-fila { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .perm-nombre { grid-column: 1 / -1; }
+      .perm-etq { display: block; }
+    }
+    /* Buzón de correo enlazado al usuario */
+    .bz { border: 1px dashed var(--linea, #cbd5e1); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+    .bz-tit { font-weight: 700; font-size: .82rem; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+    .bz-fila { display: flex; gap: 8px; flex-wrap: wrap; }
+    .bz-fila > * { flex: 1 1 180px; min-width: 0; }
+    .bz-avanzado summary { cursor: pointer; font-size: .8rem; color: var(--muted); font-weight: 600; }
+    .bz-nota { font-size: .78rem; color: var(--muted); margin: 0; }
+    .bz-estado { font-size: .82rem; margin: 0; }
+    .bz-estado.mal { color: #b91c1c; }
+    .bz-estado.bien { color: #166534; }
+    .bz-estado.aviso { color: var(--warn); }
+    code.buzon { font-family: Consolas, monospace; font-size: .78rem; }
+    .buzon-soporte { color: var(--muted); font-size: .78rem; }
+    .buzon-ilegible { background: var(--warn); color: #432c07; border-radius: 10px; padding: 1px 8px; font-size: .72rem; margin-left: 6px; white-space: nowrap; }
+    /* Región que ve el usuario (bloque del formulario de edición y columna de la tabla) */
+    .rg { border: 1px dashed var(--linea, #cbd5e1); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+    .rg-tit { font-weight: 700; font-size: .82rem; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+    .rg-nota { font-size: .78rem; color: var(--muted); margin: 0; }
+    .rg-pila { display: flex; gap: 8px; flex-wrap: wrap; }
+    .rg-pila > label { flex: 1 1 220px; min-width: 0; }
+    .rg-pila > label select[multiple] { min-height: 120px; }
+    code.region { font-family: Consolas, monospace; font-size: .78rem; }
+    .region-todas { color: var(--muted); font-size: .78rem; }
+    .region-avisada { background: rgba(245,158,11,.14); border: 1px solid var(--warn); color: #7c2d12; border-radius: 10px; padding: 1px 8px; font-size: .72rem; margin-left: 6px; white-space: nowrap; }
+  </style>
+  <link rel="stylesheet" href="/css/theme.css?v=20261120f" />
+</head>
+<body class="theme-panel">
+  <header>
+    <h1>Gestión de usuarios</h1>
+    <div class="logo-centro">Meditechnosys<span>Medical Technology Solutions</span></div>
+    <span class="badge" id="badgeUsuario">…</span>
+    <div class="botones-nav">
+      <button class="boton-nav" onclick="window.location.href='/'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Regresar
+      </button>
+      <button class="boton-nav" onclick="window.location.href='/'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Home
+      </button>
+    </div>
+  </header>
+  <div class="fondo-logo" aria-hidden="true"></div>
+
+  <main class="page-wide">
+    <section class="card">
+      <h2>Usuarios del sistema</h2>
+      <p class="store-line">Almacén activo: <code id="storeLabel">…</code></p>
+      <div class="aviso" id="avisoDegradado" hidden>
+        <strong>MySQL de usuarios no disponible.</strong> Se está usando el archivo JSON de respaldo;
+        los cambios se guardan ahí y se migran a MySQL en el próximo arranque con la base disponible.
+      </div>
+      <div class="row-actions" style="margin-top:0">
+        <button class="btn-primary" id="btnNuevo">+ Crear usuario</button>
+        <span class="hint">Altas, bajas, rol, nombre, cargo, la región que ve cada usuario, contraseña, permisos individuales y el segundo correo que puede conectar cada usuario a su bandeja. El correo de soporte siempre está disponible para todos; si aquí se enlaza uno más, el usuario verá los dos y elegirá con cuál lee y con cuál envía. El nombre y el cargo se autocompletan en actas y credenciales al elegir al usuario. Los roles se crean en <a href="/admin/roles/index.html" style="color:var(--azul);font-weight:600">Roles y permisos</a> y las regiones en <a href="/admin/programador/index.html" style="color:var(--azul);font-weight:600">Programador</a>.</span>
+      </div>
+      <div class="table-wrap" style="margin-top:14px">
+        <table>
+          <thead><tr><th>Usuario</th><th>Nombre</th><th>Cargo</th><th>Rol</th><th>Región</th><th>Segundo correo</th><th>Alta</th><th>Estado</th><th class="col-acc">Acciones</th></tr></thead>
+          <tbody id="cuerpo"></tbody>
+        </table>
+      </div>
+      <p class="empty" id="vacio" hidden>No hay usuarios registrados.</p>
+    </section>
+  </main>
+
+  <dialog class="modal" id="dlgCrear" aria-labelledby="titCrear">
+    <form class="modal-form" id="formCrear" novalidate>
+      <h3 id="titCrear">Nuevo usuario</h3>
+      <label>Usuario
+        <input id="creUsuario" required minlength="3" maxlength="40" autocomplete="off" placeholder="p. ej. jgarcia">
+      </label>
+      <label>Nombre completo
+        <input id="creNombre" maxlength="120" autocomplete="off" placeholder="p. ej. Juan García López">
+      </label>
+      <label>Cargo
+        <input id="creCargo" maxlength="80" autocomplete="off" placeholder="p. ej. Ingeniero biomédico">
+      </label>
+      <label>Contraseña
+        <input id="crePassword" type="password" required minlength="3" autocomplete="new-password" placeholder="Mínimo 3 caracteres">
+      </label>
+      <label>Rol
+        <select id="creRol"></select>
+      </label>
+      <div class="bz">
+        <div class="bz-tit">Segundo correo de la bandeja (opcional)</div>
+        <p class="bz-nota">Todos ven siempre el correo de soporte. Si aquí se enlaza además un correo
+          propio, esa persona tendrá los dos en <a href="/admin/correos/index.html" style="color:var(--azul)">la bandeja</a>:
+          elegirá cuál lee y con cuál envía. Si se deja vacío, solo verá el de soporte.</p>
+        <label>Correo del segundo buzón
+          <input id="creBuzCorreo" type="email" maxlength="160" autocomplete="off" placeholder="p. ej. jmendez@meditechnosys.mx">
+        </label>
+        <label>Contraseña de ese correo
+          <input id="creBuzPassword" type="password" autocomplete="new-password" placeholder="Se guarda cifrada en el servidor">
+        </label>
+        <input type="checkbox" id="creBuzMantener" hidden>
+        <label>Nombre que verán al recibirle
+          <input id="creBuzNombre" maxlength="120" autocomplete="off" placeholder="p. ej. Juan Méndez — Soporte Meditechnosys">
+        </label>
+        <details class="bz-avanzado">
+          <summary>Servidores del segundo correo (IMAP / SMTP)</summary>
+          <label>Servidor de entrada (IMAP)
+            <input id="creBuzImapHost" autocomplete="off" value="mail.meditechnosys.mx">
+          </label>
+          <div class="bz-fila">
+            <label>Puerto<input id="creBuzImapPort" type="number" min="1" max="65535" value="993"></label>
+            <label>Conexión
+              <select id="creBuzImapSsl"><option value="1">SSL (993)</option><option value="0">STARTTLS (143)</option></select>
+            </label>
+          </div>
+          <label>Servidor de salida (SMTP)
+            <input id="creBuzSmtpHost" autocomplete="off" value="mail.meditechnosys.mx">
+          </label>
+          <div class="bz-fila">
+            <label>Puerto<input id="creBuzSmtpPort" type="number" min="1" max="65535" value="465"></label>
+            <label>Conexión
+              <select id="creBuzSmtpSsl"><option value="1">SSL (465)</option><option value="0">STARTTLS (587)</option></select>
+            </label>
+          </div>
+        </details>
+        <div class="bz-fila" style="align-items:center">
+          <button type="button" class="btn-secondary" id="creBuzProbar">Probar conexión</button>
+          <p class="bz-estado" id="creBuzEstado"></p>
+        </div>
+      </div>
+      <p class="form-error" id="errCrear" role="alert" hidden></p>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" data-cerrar>Cancelar</button>
+        <button type="submit" class="btn-primary">Crear</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="modal" id="dlgEditar" aria-labelledby="titEditar">
+    <form class="modal-form" id="formEditar" novalidate>
+      <h3 id="titEditar">Editar usuario · <span id="ediNombre"></span></h3>
+      <label>Rol
+        <select id="ediRol"></select>
+      </label>
+      <label>Nombre completo
+        <input id="ediNombreCompleto" maxlength="120" autocomplete="off" placeholder="Nombre y apellidos">
+      </label>
+      <label>Cargo
+        <input id="ediCargo" maxlength="80" autocomplete="off" placeholder="Puesto que desempeña">
+      </label>
+      <div class="rg">
+        <div class="rg-tit">Región que ve</div>
+        <p class="rg-nota">Con regiones asignadas, esta persona solo ve y registra lo de los hospitales
+          de esas regiones: listas, filtros, exportaciones y los desplegables de Hospital/Servicio. Elija
+          <b>«Todas las regiones»</b> en la lista para que no tenga límite. Las regiones se
+          arman en <a href="/admin/programador/index.html" style="color:var(--azul);font-weight:600">Programador</a>.</p>
+        <label>Regiones
+          <select id="ediRegion" multiple></select>
+        </label>
+        <p class="bz-estado" id="ediRegionNota"></p>
+      </div>
+      <label>Nueva contraseña <span style="text-transform:none;letter-spacing:0">(opcional)</span>
+        <input id="ediPassword" type="password" minlength="3" autocomplete="new-password" placeholder="En blanco para no cambiarla">
+      </label>
+      <label style="flex-direction:row;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.9rem;color:var(--texto);font-weight:400">
+        <input type="checkbox" id="ediActivo" style="width:auto"> Usuario activo
+      </label>
+      <div class="bz">
+        <div class="bz-tit">Segundo correo de la bandeja</div>
+        <p class="bz-nota">El correo de soporte siempre lo tiene. Aquí se enlaza, además, el correo propio
+          del usuario; la bandeja deja elegir cuál de los dos lee y con cuál envía.</p>
+        <p class="bz-estado" id="ediBuzEstado"></p>
+        <label>Correo del segundo buzón
+          <input id="ediBuzCorreo" type="email" maxlength="160" autocomplete="off" placeholder="Sin segundo correo: solo verá el de soporte">
+        </label>
+        <label>Contraseña de ese correo
+          <input id="ediBuzPassword" type="password" autocomplete="new-password" placeholder="En blanco para mantener la guardada">
+        </label>
+        <div class="bz-fila">
+          <label style="flex:1 1 100%">Nombre que verán al recibirle
+            <input id="ediBuzNombre" maxlength="120" autocomplete="off" placeholder="p. ej. Juan Méndez — Soporte Meditechnosys">
+          </label>
+        </div>
+        <div class="bz-fila">
+          <label class="palanca" style="font-size:.85rem"><input type="checkbox" id="ediBuzMantener" style="width:auto"> Mantener la contraseña guardada</label>
+          <label class="palanca" style="font-size:.85rem"><input type="checkbox" id="ediBuzLimpiar" style="width:auto"> Quitar el segundo correo (dejar solo el de soporte)</label>
+        </div>
+        <details class="bz-avanzado">
+          <summary>Servidores del segundo correo (IMAP / SMTP)</summary>
+          <label>Servidor de entrada (IMAP)<input id="ediBuzImapHost" autocomplete="off" value="mail.meditechnosys.mx"></label>
+          <div class="bz-fila">
+            <label>Puerto<input id="ediBuzImapPort" type="number" min="1" max="65535" value="993"></label>
+            <label>Conexión
+              <select id="ediBuzImapSsl"><option value="1">SSL (993)</option><option value="0">STARTTLS (143)</option></select>
+            </label>
+          </div>
+          <label>Servidor de salida (SMTP)<input id="ediBuzSmtpHost" autocomplete="off" value="mail.meditechnosys.mx"></label>
+          <div class="bz-fila">
+            <label>Puerto<input id="ediBuzSmtpPort" type="number" min="1" max="65535" value="465"></label>
+            <label>Conexión
+              <select id="ediBuzSmtpSsl"><option value="1">SSL (465)</option><option value="0">STARTTLS (587)</option></select>
+            </label>
+          </div>
+        </details>
+        <div class="bz-fila" style="align-items:center">
+          <button type="button" class="btn-secondary" id="ediBuzProbar">Probar conexión</button>
+        </div>
+      </div>
+      <p class="form-error" id="errEditar" role="alert" hidden></p>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" data-cerrar>Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar cambios</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="modal permisos" id="dlgPermisos" aria-labelledby="titPermisos">
+    <div class="modal-form modal-alto">
+      <h3 id="titPermisos">Permisos de <span id="permNombre"></span></h3>
+      <p class="hint" id="permIntro" style="margin:0 0 10px"></p>
+      <div class="perm-buscar">
+        <input type="search" id="permBusqueda" placeholder="Buscar permiso…">
+        <button type="button" id="permExpandirTodo" class="btn-secondary btn-mini">Expandir todo</button>
+        <button type="button" id="permColapsarTodo" class="btn-secondary btn-mini">Colapsar todo</button>
+      </div>
+      <div id="permCuerpo"></div>
+      <p class="form-error" id="errPermisos" role="alert" hidden></p>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" data-cerrar>Cancelar</button>
+        <button type="button" class="btn-primary" id="btnGuardarPermisos">Guardar ajustes</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+  (function () {
+    'use strict';
+    var cuerpo = document.getElementById('cuerpo');
+    var vacio = document.getElementById('vacio');
+    var dlgCrear = document.getElementById('dlgCrear');
+    var dlgEditar = document.getElementById('dlgEditar');
+    var dlgPermisos = document.getElementById('dlgPermisos');
+    var editando = null;
+    var ROLES = [];   // [{ nombre, esSistema }]
+    var BUZONES = {}; // usuario en minusculas -> { correo, imapHost, smtpHost, tieneContrasena, contrasenaLegible, ... }
+    var REGIONES = [];  // nombres de región guardados por el Programador
+    var DESGLOSE = {};  // región -> [hospitales] (para avisar si la región aún no tiene ninguno)
+
+    function nombreRol(rol) {
+      if (!rol) return '(sin rol)';
+      if (String(rol).toLowerCase() === 'admin') return 'Administrador';
+      if (String(rol).toLowerCase() === 'ingeniero') return 'Ingeniero';
+      return rol;
+    }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+    // Llamadas al grupo /api/usuarios (usa la cookie de sesión).
+    function api(ruta, opciones) {
+      return fetch('/api/usuarios' + ruta, Object.assign({
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        credentials: 'same-origin'
+      }, opciones)).then(function (r) {
+        if (r.status === 204) return null;
+        return r.json().catch(function () { return {}; }).then(function (data) {
+          if (!r.ok) throw new Error(data.error || ('Error ' + r.status));
+          return data;
+        });
+      });
+    }
+    // Llamada absoluta (para /api/roles, /api/buzones y /api/patologia/me).
+    function apiAbs(ruta, opciones) {
+      return fetch(ruta, Object.assign({ credentials: 'same-origin', headers: { Accept: 'application/json' } }, opciones || {}))
+        .then(function (r) {
+          if (r.status === 204) return {};
+          return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok) throw new Error(d.error || ('Error ' + r.status)); return d; });
+        });
+    }
+
+    function fecha(iso) {
+      var d = new Date(iso);
+      if (isNaN(d)) return '—';
+      var p = function (n) { return (n < 10 ? '0' : '') + n; };
+      return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear();
+    }
+
+    function mostrarError(el, msg) { el.textContent = msg; el.hidden = false; }
+    function ocultarError(el) { el.textContent = ''; el.hidden = true; }
+
+    function llenarSelect(sel, valor) {
+      sel.innerHTML = '';
+      ROLES.forEach(function (r) {
+        var op = document.createElement('option');
+        op.value = r.nombre; op.textContent = nombreRol(r.nombre);
+        sel.appendChild(op);
+      });
+      if (valor) sel.value = valor;
+    }
+
+    function pintar(lista) {
+      cuerpo.innerHTML = '';
+      vacio.hidden = lista.length > 0;
+      lista.forEach(function (u) {
+        var activo = u.activo !== false;
+        var tr = document.createElement('tr');
+        tr.dataset.usuario = u.usuario; tr.dataset.rol = u.rol; tr.dataset.activo = activo ? '1' : '0';
+        tr.dataset.nombre = u.nombre || ''; tr.dataset.cargo = u.cargo || '';
+        // regiones puede ser un array o un string (para compatibilidad)
+        var regionesArray = Array.isArray(u.regiones) ? u.regiones : (u.region ? [u.region] : []);
+        tr.dataset.regiones = JSON.stringify(regionesArray);
+        tr.dataset.vertodas = u.verTodas ? '1' : '0';
+        tr.innerHTML = '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="col-acc"></td>';
+        tr.children[0].textContent = u.usuario;
+        tr.children[1].textContent = u.nombre || '—';
+        tr.children[2].textContent = u.cargo || '—';
+        tr.children[3].textContent = nombreRol(u.rol);
+        // Columna Región: los nombres cuando de verdad limita, y si no, por qué no limita. Sin asignar,
+        // con «ver todas» o siendo root sale como «Todas».
+        var cReg = tr.children[4];
+        if (regionesArray.length > 0 && !u.verTodas) {
+          regionesArray.forEach(function (r, i) {
+            if (i > 0) {
+              var sep = document.createElement('span');
+              sep.textContent = ', ';
+              sep.style.margin = '0 4px';
+              cReg.appendChild(sep);
+            }
+            var codReg = document.createElement('code');
+            codReg.className = 'region'; codReg.textContent = r;
+            cReg.appendChild(codReg);
+            if (!(DESGLOSE[r] || []).length) {
+              var av = document.createElement('span');
+              av.className = 'region-avisada'; av.textContent = 'sin hospitales';
+              av.title = 'La región no tiene hospitales en el Programador, así que por ahora no le limita: agregue sus hospitales o asígnele otra.';
+              cReg.appendChild(av);
+            }
+          });
+        } else {
+          var sp2 = document.createElement('span');
+          sp2.className = 'region-todas';
+          sp2.textContent = String(u.usuario).toLowerCase() === 'root' ? 'Todas (root)' : 'Todas';
+          cReg.appendChild(sp2);
+        }
+        var bz = BUZONES[String(u.usuario).toLowerCase()];
+        if (bz && bz.correo) {
+          var cod = document.createElement('code');
+          cod.className = 'buzon'; cod.textContent = bz.correo;
+          tr.children[5].appendChild(cod);
+          // El enlace existe pero la contrasena guardada ya no se puede descifrar con la clave
+          // actual del servidor: hay que reescribirla, si no la bandeja de esa persona no abre.
+          if (bz.tieneContrasena && bz.contrasenaLegible === false) {
+            var avis = document.createElement('span');
+            avis.className = 'buzon-ilegible';
+            avis.textContent = 'contraseña por reescribir';
+            avis.title = 'El segundo correo está enlazado, pero la contraseña guardada no se pudo leer con la clave actual del servidor. Abra Editar, vuelva a escribirla y guarde.';
+            tr.children[5].appendChild(avis);
+          }
+        } else {
+          var sp = document.createElement('span');
+          sp.className = 'buzon-soporte'; sp.textContent = 'Sin enlazar (solo soporte)';
+          tr.children[5].appendChild(sp);
+        }
+        tr.children[6].textContent = fecha(u.creado);
+        var code = document.createElement('code');
+        code.className = 'estado' + (activo ? '' : ' inactivo');
+        code.textContent = activo ? 'Activo' : 'Inactivo';
+        tr.children[7].appendChild(code);
+        var acc = tr.children[8];
+        [['permisos', 'Permisos', 'btn-primary'], ['editar', 'Editar', 'btn-secondary'], ['alternar', activo ? 'Desactivar' : 'Activar', 'btn-secondary'], ['eliminar', 'Eliminar', 'btn-danger']]
+          .forEach(function (b) {
+            var btn = document.createElement('button');
+            btn.type = 'button'; btn.className = b[2] + ' btn-mini'; btn.textContent = b[1]; btn.dataset.accion = b[0];
+            acc.appendChild(btn);
+          });
+        cuerpo.appendChild(tr);
+      });
+    }
+
+    function cargar() {
+      return api('', { method: 'GET' }).then(pintar)
+        .catch(function (e) { mostrarError(document.getElementById('errCrear'), 'No se pudo cargar la lista: ' + e.message); });
+    }
+
+    function cargarRoles() {
+      return apiAbs('/api/roles').then(function (d) { ROLES = d.roles || []; })
+        .catch(function () { ROLES = [{ nombre: 'Admin', esSistema: true }, { nombre: 'Ingeniero', esSistema: true }]; });
+    }
+
+    // Buzones enlazados (correo y servidores, sin contrasenas) para la tabla y los formularios.
+    function cargarBuzones() {
+      return apiAbs('/api/buzones').then(function (lista) {
+        BUZONES = {};
+        (lista || []).forEach(function (b) { BUZONES[String(b.usuario).toLowerCase()] = b; });
+      }).catch(function () { });
+    }
+
+    // Regiones del Programador y su desglose, para el desplegable y los avisos de la pantalla.
+    function cargarRegiones() {
+      return api('/regiones', { method: 'GET' }).then(function (d) {
+        REGIONES = d.regiones || [];
+        DESGLOSE = d.hospitalesPorRegion || {};
+      }).catch(function () { REGIONES = []; DESGLOSE = {}; });
+    }
+
+    // ---- región del formulario de edición ----
+    // Lista múltiple: «Todas las regiones» (sin límite) arriba y después cada región del Programador.
+    // Ahora soporta selección múltiple de regiones para un usuario.
+    function llenarRegion(valores) {
+      var sel = document.getElementById('ediRegion');
+      sel.innerHTML = '';
+      var sin = document.createElement('option');
+      sin.value = ''; sin.textContent = 'Todas las regiones';
+      sel.appendChild(sin);
+      REGIONES.forEach(function (r) {
+        var op = document.createElement('option');
+        var n = (DESGLOSE[r] || []).length;
+        op.value = r;
+        op.textContent = r + (n ? ' · ' + n + (n === 1 ? ' hospital' : ' hospitales') : ' · sin hospitales');
+        sel.appendChild(op);
+      });
+      // valores puede ser un string (para compatibilidad) o un array
+      var regionesArray = Array.isArray(valores) ? valores : (valores ? [valores] : []);
+      // Seleccionar las regiones guardadas
+      Array.from(sel.options).forEach(function (op) {
+        op.selected = regionesArray.indexOf(op.value) >= 0;
+      });
+      // Si alguna región guardada ya no está en la lista (la quitó el Programador) conviene que se vea
+      // igual: se agrega al final para que el Admin decida.
+      regionesArray.forEach(function (valor) {
+        if (valor && REGIONES.indexOf(valor) < 0) {
+          var huerfana = document.createElement('option');
+          huerfana.value = valor; huerfana.textContent = valor + ' (ya no está en el catálogo)';
+          sel.appendChild(huerfana);
+          huerfana.selected = true;
+        }
+      });
+    }
+
+    // Obtiene las regiones seleccionadas del select múltiple
+    function obtenerRegionesSeleccionadas() {
+      var sel = document.getElementById('ediRegion');
+      var seleccionadas = [];
+      Array.from(sel.selectedOptions).forEach(function (op) {
+        if (op.value) seleccionadas.push(op.value);
+      });
+      return seleccionadas;
+    }
+
+    // Nota dinámica: cuántos hospitales le tocarían y por qué no limitaría.
+    function avisarRegion() {
+      var sel = document.getElementById('ediRegion');
+      var nota = document.getElementById('ediRegionNota');
+      nota.className = 'bz-estado';
+      var seleccionadas = obtenerRegionesSeleccionadas();
+      if (seleccionadas.length === 0) {
+        nota.textContent = '«Todas las regiones»: ve los hospitales de todas las regiones, sin límite.';
+      } else {
+        var totalHospitales = 0;
+        var nombresHospitales = [];
+        seleccionadas.forEach(function (r) {
+          var hospitales = DESGLOSE[r] || [];
+          totalHospitales += hospitales.length;
+          nombresHospitales = nombresHospitales.concat(hospitales);
+        });
+        nota.textContent = totalHospitales > 0
+          ? 'Verá solo ' + totalHospitales + ' ' + (totalHospitales === 1 ? 'hospital' : 'hospitales') + ' de las regiones «' + seleccionadas.join('», «') + '»: ' + nombresHospitales.join(', ') + '.'
+          : 'Las regiones seleccionadas todavía no tienen hospitales en el Programador, así que no se pueden asignar: escriba los suyos o elija «Todas las regiones».';
+      }
+    }
+
+    // ---- el segundo correo de la bandeja (el de soporte siempre esta disponible) ----
+    var CORREO_OK = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
+
+    // Lee los campos de un bloque de buzón (prefijo de ids: 'cre' o 'edi').
+    function leerBuzon(prefijo) {
+      var v = function (sufijo) { return document.getElementById(prefijo + sufijo).value; };
+      var correo = v('BuzCorreo').trim();
+      var pass = v('BuzPassword');
+      var o = {
+        correo: correo,
+        password: pass,
+        mantenerContrasena: false,
+        limpiar: false,
+        imapHost: v('BuzImapHost').trim() || 'mail.meditechnosys.mx',
+        imapPort: parseInt(v('BuzImapPort'), 10) || 993,
+        imapSsl: v('BuzImapSsl') === '1',
+        smtpHost: v('BuzSmtpHost').trim() || 'mail.meditechnosys.mx',
+        smtpPort: parseInt(v('BuzSmtpPort'), 10) || 465,
+        smtpSsl: v('BuzSmtpSsl') === '1',
+        remitenteNombre: v('BuzNombre').trim()
+      };
+      if (prefijo === 'edi') o.mantenerContrasena = !!o.correo && !pass;
+      return o;
+    }
+
+    // Valida el bloque antes de mandar nada: vacio = sin segundo correo (solo vera el de soporte).
+    function validarBuzon(prefijo) {
+      var b = leerBuzon(prefijo);
+      if (!b.correo) return null;
+      if (!CORREO_OK.test(b.correo)) return 'El segundo correo no tiene un formato valido.';
+      if (!b.imapHost) return 'Indica el servidor de entrada (IMAP).';
+      if (!b.smtpHost) return 'Indica el servidor de salida (SMTP).';
+      var mantener = document.getElementById(prefijo + 'BuzMantener');
+      if (!b.password && !(b.mantenerContrasena && mantener && mantener.checked))
+        return 'Escribe la contrasena del segundo correo ' + b.correo + '.';
+      return null;
+    }
+
+    // El alta no tiene casillas de "mantener"/"desvincular" (no hay buzón previo): se leen
+    // solo si existen en el formulario que se esté usando.
+    function marcado(id) { var el = document.getElementById(id); return !!(el && el.checked); }
+
+    function payloadBuzon(prefijo) {
+      var b = leerBuzon(prefijo);
+      return {
+        correo: b.correo,
+        password: b.password || null,
+        mantenerContrasena: marcado(prefijo + 'BuzMantener'),
+        limpiar: marcado(prefijo + 'BuzLimpiar'),
+        imapHost: b.imapHost, imapPort: b.imapPort, imapSsl: b.imapSsl,
+        smtpHost: b.smtpHost, smtpPort: b.smtpPort, smtpSsl: b.smtpSsl,
+        remitenteNombre: b.remitenteNombre
+      };
+    }
+
+    // Prueba un buzón contra IMAP y SMTP sin guardarlo (usa la ruta absoluta de la API).
+    function probarBuzon(prefijo, idEstado) {
+      var estado = document.getElementById(idEstado);
+      var b = leerBuzon(prefijo);
+      var mantener = marcado(prefijo + 'BuzMantener');
+      estado.className = 'bz-estado';
+      if (!b.correo) { estado.textContent = 'Escribe primero el segundo correo.'; estado.className = 'bz-estado mal'; return; }
+      if (!b.password && mantener) { estado.textContent = 'Probando con la contrasena ya guardada…'; }
+      else if (!b.password) { estado.textContent = 'Falta la contrasena.'; estado.className = 'bz-estado mal'; return; }
+      else estado.textContent = 'Probando ' + b.correo + '…';
+      var boton = document.getElementById(prefijo + 'BuzProbar');
+      boton.disabled = true;
+      apiAbs('/api/correos/probar', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          correo: b.correo, password: b.password || null,
+          imapHost: b.imapHost, imapPort: b.imapPort, imapSsl: b.imapSsl,
+          smtpHost: b.smtpHost, smtpPort: b.smtpPort, smtpSsl: b.smtpSsl
+        }) })
+        .then(function (d) { estado.textContent = (d && d.mensaje) || 'El buzon responde: puede leer y enviar.'; estado.className = 'bz-estado bien'; })
+        .catch(function (e) { estado.textContent = String(e.message || e); estado.className = 'bz-estado mal'; })
+        .finally(function () { boton.disabled = false; });
+    }
+
+    function rellenarBuzonEdicion(usuario) {
+      var b = BUZONES[String(usuario).toLowerCase()] || null;
+      document.getElementById('ediBuzCorreo').value = (b && b.correo) || '';
+      document.getElementById('ediBuzNombre').value = (b && b.remitenteNombre) || '';
+      document.getElementById('ediBuzImapHost').value = (b && b.imapHost) || 'mail.meditechnosys.mx';
+      document.getElementById('ediBuzImapPort').value = (b && b.imapPort) || 993;
+      document.getElementById('ediBuzImapSsl').value = (b && b.imapSsl === false) ? '0' : '1';
+      document.getElementById('ediBuzSmtpHost').value = (b && b.smtpHost) || 'mail.meditechnosys.mx';
+      document.getElementById('ediBuzSmtpPort').value = (b && b.smtpPort) || 465;
+      document.getElementById('ediBuzSmtpSsl').value = (b && b.smtpSsl === false) ? '0' : '1';
+      // "Mantener la guardada" solo tiene sentido si esa contrasena todavia se puede leer con la
+      // clave actual del servidor; si no, se exige reescribirla para que el enlace vuelva a abrir.
+      var legible = !!(b && b.tieneContrasena && b.contrasenaLegible !== false);
+      var rota = !!(b && b.correo && b.tieneContrasena && b.contrasenaLegible === false);
+      document.getElementById('ediBuzPassword').value = '';
+      document.getElementById('ediBuzPassword').placeholder = legible ? 'En blanco para mantener la guardada' : 'Contrasena del segundo correo';
+      document.getElementById('ediBuzMantener').checked = legible;
+      document.getElementById('ediBuzMantener').disabled = !legible;
+      document.getElementById('ediBuzLimpiar').checked = false;
+      document.getElementById('ediBuzLimpiar').disabled = !(legible || rota);
+      var est = document.getElementById('ediBuzEstado');
+      if (legible) { est.textContent = 'Segundo correo enlazado: ' + b.correo; est.className = 'bz-estado bien'; }
+      else if (rota) {
+        est.textContent = 'El segundo correo ' + b.correo + ' tiene una contrasena que ya no se puede leer con la clave actual del servidor: vuelva a escribirla aqui y guarde para que la bandeja vuelva a abrir.';
+        est.className = 'bz-estado aviso';
+      }
+      else { est.textContent = 'Sin segundo correo enlazado: solo vera el de soporte.'; est.className = 'bz-estado'; }
+    }
+
+    // ---- crear ----
+    document.getElementById('btnNuevo').addEventListener('click', function () {
+      document.getElementById('formCrear').reset();
+      ['creBuzCorreo', 'creBuzPassword', 'creBuzNombre'].forEach(function (id) { document.getElementById(id).value = ''; });
+      document.getElementById('creBuzImapHost').value = 'mail.meditechnosys.mx';
+      document.getElementById('creBuzSmtpHost').value = 'mail.meditechnosys.mx';
+      document.getElementById('creBuzImapPort').value = '993';
+      document.getElementById('creBuzSmtpPort').value = '465';
+      document.getElementById('creBuzImapSsl').value = '1';
+      document.getElementById('creBuzSmtpSsl').value = '1';
+      document.getElementById('creBuzEstado').textContent = '';
+      document.getElementById('creBuzEstado').className = 'bz-estado';
+      llenarSelect(document.getElementById('creRol'), ROLES.length ? (ROLES.filter(function (r) { return r.nombre === 'Ingeniero'; })[0] ? 'Ingeniero' : ROLES[0].nombre) : '');
+      ocultarError(document.getElementById('errCrear'));
+      dlgCrear.showModal();
+      document.getElementById('creUsuario').focus();
+    });
+
+    document.getElementById('formCrear').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      ocultarError(document.getElementById('errCrear'));
+      var errBuz = validarBuzon('cre');
+      if (errBuz) { mostrarError(document.getElementById('errCrear'), errBuz); return; }
+      var buzon = document.getElementById('creBuzCorreo').value.trim() ? payloadBuzon('cre') : null;
+      api('', { method: 'POST', body: JSON.stringify({
+        usuario: document.getElementById('creUsuario').value.trim(),
+        password: document.getElementById('crePassword').value,
+        rol: document.getElementById('creRol').value,
+        nombre: document.getElementById('creNombre').value.trim(),
+        cargo: document.getElementById('creCargo').value.trim(),
+        buzon: buzon
+      }) }).then(function (d) {
+        dlgCrear.close();
+        if (d && d.buzonError) alert('El usuario se creó, pero el segundo correo no se guardó: ' + d.buzonError);
+        cargarBuzones().then(cargar);
+      })
+        .catch(function (e) { mostrarError(document.getElementById('errCrear'), e.message); });
+    });
+    document.getElementById('creBuzProbar').addEventListener('click', function () { probarBuzon('cre', 'creBuzEstado'); });
+    // Si no hay correo, el bloque de buzón no tiene nada que probar ni validar.
+    document.getElementById('creBuzCorreo').addEventListener('input', function (ev) {
+      var lleno = !!ev.target.value.trim();
+      document.getElementById('creBuzPassword').required = lleno;
+    });
+
+    // ---- editar (rol, nombre, cargo, región, contraseña, activo) ----
+    function abrirEditar(usuario, rol, activo, nombre, cargo, regiones, verTodas) {
+      // regiones puede ser un string (para compatibilidad) o un array
+      var regionesArray = Array.isArray(regiones) ? regiones : (regiones ? [regiones] : []);
+      editando = {
+        usuario: usuario, rol: rol, activo: activo, nombre: nombre || '', cargo: cargo || '',
+        regiones: regionesArray, verTodas: !!verTodas
+      };
+      document.getElementById('ediNombre').textContent = usuario;
+      llenarSelect(document.getElementById('ediRol'), rol);
+      document.getElementById('ediNombreCompleto').value = editando.nombre;
+      document.getElementById('ediCargo').value = editando.cargo;
+      document.getElementById('ediPassword').value = '';
+      document.getElementById('ediActivo').checked = activo;
+      // Región: root es el superusuario, así que su lista se abre en «Todas las regiones» y bloqueada
+      // (el servidor también rechaza asignarle una). Un renglón guardado con la antigua casilla «ver
+      // todas» marcada sale igual en «Todas las regiones», que es lo que de verdad estaba viendo.
+      var esRoot = String(usuario).toLowerCase() === 'root';
+      var sel = document.getElementById('ediRegion');
+      editando.regionLista = (esRoot || editando.verTodas) ? [] : editando.regiones;
+      llenarRegion(editando.regionLista);
+      // Solo root tiene bloqueado el select de regiones (el administrador puede modificar las regiones de cualquier usuario)
+      sel.disabled = esRoot;
+      var nota = document.getElementById('ediRegionNota');
+      if (esRoot) {
+        nota.className = 'bz-estado';
+        nota.textContent = 'root siempre ve todas las regiones: no necesita (ni admite) asignación.';
+      } else {
+        avisarRegion();
+      }
+      ocultarError(document.getElementById('errEditar'));
+      dlgEditar.showModal();
+    }
+
+    document.getElementById('formEditar').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      ocultarError(document.getElementById('errEditar'));
+      var rol = document.getElementById('ediRol').value;
+      var password = document.getElementById('ediPassword').value;
+      var activo = document.getElementById('ediActivo').checked;
+      var nombre = document.getElementById('ediNombreCompleto').value.trim();
+      var cargo = document.getElementById('ediCargo').value.trim();
+      var correoBuzon = document.getElementById('ediBuzCorreo').value.trim();
+      var previoBuzon = BUZONES[String(editando.usuario).toLowerCase()] || null;
+      var correoPrevio = (previoBuzon && previoBuzon.correo) || '';
+      // Desvincular: por la casilla o por dejar el correo vacio cuando ya tenia uno enlazado.
+      var limpiar = document.getElementById('ediBuzLimpiar').checked || (!!correoPrevio && !correoBuzon);
+      var errBuz = limpiar ? null : validarBuzon('edi');
+      if (errBuz) { mostrarError(document.getElementById('errEditar'), errBuz); return; }
+      var u = encodeURIComponent(editando.usuario);
+      var cadena = Promise.resolve();
+      if (rol !== editando.rol) cadena = cadena.then(function () { return api('/' + u + '/rol', { method: 'PUT', body: JSON.stringify({ rol: rol }) }); });
+      if (nombre !== editando.nombre || cargo !== editando.cargo)
+        cadena = cadena.then(function () { return api('/' + u + '/datos', { method: 'PUT', body: JSON.stringify({ nombre: nombre, cargo: cargo }) }); });
+      if (password) cadena = cadena.then(function () { return api('/' + u + '/password', { method: 'PUT', body: JSON.stringify({ password: password }) }); });
+      if (activo !== editando.activo) cadena = cadena.then(function () { return api('/' + u + '/activo', { method: 'PUT', body: JSON.stringify({ activo: activo }) }); });
+      // Región: se manda solo si cambió lo que muestra la lista. Elegir «Todas las regiones» guarda la
+      // lista vacía, que en el servidor quita el renglón y deja ver todo.
+      var esRaiz = String(editando.usuario).toLowerCase() === 'root';
+      if (!esRaiz) {
+        var regionesSeleccionadas = obtenerRegionesSeleccionadas();
+        // Comparar arrays para detectar cambios
+        var igual = regionesSeleccionadas.length === editando.regionLista.length &&
+          regionesSeleccionadas.every(function (r, i) { return r === editando.regionLista[i]; });
+        if (!igual) {
+          cadena = cadena.then(function () {
+            return api('/' + u + '/region', { method: 'PUT', body: JSON.stringify({ regiones: regionesSeleccionadas, todas: false }) });
+          });
+        }
+      }
+      // Buzón: desvincular, o guardar si cambio algo respecto a lo ya enlazado. Un usuario nuevo
+      // no tiene buzón previo, así que todo se compara contra valores por defecto seguros.
+      if (limpiar) {
+        cadena = cadena.then(function () { return api('/' + u + '/buzon', { method: 'PUT', body: JSON.stringify({ limpiar: true }) }); });
+      } else if (correoBuzon) {
+        var nuevo = payloadBuzon('edi');
+        var previo = previoBuzon || {};
+        var igual = !!correoPrevio && correoBuzon.toLowerCase() === String(correoPrevio).toLowerCase() &&
+          nuevo.imapHost === (previo.imapHost || '') && nuevo.imapPort === (previo.imapPort || 993) &&
+          nuevo.imapSsl === !!previo.imapSsl && nuevo.smtpHost === (previo.smtpHost || '') &&
+          nuevo.smtpPort === (previo.smtpPort || 465) && nuevo.smtpSsl === !!previo.smtpSsl &&
+          nuevo.remitenteNombre === (previo.remitenteNombre || '');
+        if (!igual || nuevo.password) {
+          // Sin buzón previo no hay contraseña que mantener: la que se escribe es obligatoria.
+          if (!correoPrevio) nuevo.mantenerContrasena = false;
+          cadena = cadena.then(function () { return api('/' + u + '/buzon', { method: 'PUT', body: JSON.stringify(nuevo) }); });
+        }
+      }
+      cadena.then(function () { dlgEditar.close(); cargarBuzones().then(cargar); })
+        .catch(function (e) { mostrarError(document.getElementById('errEditar'), e.message); });
+    });
+    document.getElementById('ediBuzProbar').addEventListener('click', function () { probarBuzon('edi', 'ediBuzEstado'); });
+    document.getElementById('ediRegion').addEventListener('change', avisarRegion);
+
+    // ---- permisos por usuario (rol como plantilla + ajustes) ----
+    var permUsuario = null, permGrupos = [], permRolPermisos = [], permRol = null;
+    var permFilas = []; // para filtrar
+
+    function estadoDe(clave, ajuste) {
+      // Admin siempre conserva roles.administrar (anti-bloqueo), igual que el servidor.
+      if (String(permRol).toLowerCase() === 'admin' && clave === 'roles.administrar') return 'fijo';
+      if (ajuste === 'conceder') return 'marcado';
+      if (ajuste === 'revocar') return 'desmarcado';
+      return permRolPermisos.indexOf(clave) >= 0 ? 'heredado' : 'desmarcado';
+    }
+
+    function actualizarCheck(chk, etq, estado, clave) {
+      chk.checked = estado === 'marcado';
+      chk.indeterminate = estado === 'heredado';
+      chk.disabled = String(permRol).toLowerCase() === 'admin' && clave === 'roles.administrar';
+      var texto = estado === 'heredado' ? '<span class="heredado">Heredado</span>' :
+                   estado === 'marcado' ? '<span class="si">Sí</span>' :
+                   estado === 'fijo' ? '<span class="si">Fijo</span>' : '<span class="no">No</span>';
+      etq.innerHTML = texto;
+    }
+
+    function abrirPermisos(usuario) {
+      permUsuario = usuario;
+      ocultarError(document.getElementById('errPermisos'));
+      document.getElementById('permNombre').textContent = usuario;
+      document.getElementById('permCuerpo').innerHTML = '<p class="hint" style="padding:14px">Cargando…</p>';
+      dlgPermisos.showModal();
+      api('/' + encodeURIComponent(usuario) + '/permisos', { method: 'GET' }).then(function (d) {
+        permGrupos = d.grupos || [];
+        permRolPermisos = d.rolPermisos || [];
+        permRol = d.rol || '';
+        var ajustes = {};
+        (d.ajustes || []).forEach(function (a) { ajustes[a.clave] = a.concedido ? 'conceder' : 'revocar'; });
+        document.getElementById('permIntro').textContent =
+          'Rol: ' + nombreRol(permRol) + '. Marca para conceder (cuando el rol no lo tiene) o revocar (cuando el rol sí lo tiene). Los permisos del rol se marcan con casilla punteada.';
+        pintarPermisos(ajustes);
+      }).catch(function (e) {
+        document.getElementById('permCuerpo').innerHTML = '';
+        mostrarError(document.getElementById('errPermisos'), 'No se pudieron cargar los permisos: ' + e.message);
+      });
+    }
+
+    function pintarPermisos(ajustes) {
+      var cont = document.getElementById('permCuerpo');
+      cont.innerHTML = '';
+      permFilas = [];
+      permGrupos.forEach(function (g) {
+        var sec = document.createElement('div');
+        sec.className = 'perm-grupo-sec';
+        var cab = document.createElement('div');
+        cab.className = 'perm-grupo-cab';
+        cab.textContent = g.nombre;
+        var count = document.createElement('span');
+        count.className = 'perm-count';
+        count.textContent = (g.permisos || []).length + ' permiso(s)';
+        cab.appendChild(count);
+        cab.addEventListener('click', function () { sec.classList.toggle('abierto'); });
+        sec.appendChild(cab);
+        var body = document.createElement('div');
+        body.className = 'perm-grupo-body';
+        (g.permisos || []).forEach(function (p) {
+          var fila = document.createElement('div');
+          fila.className = 'perm-fila';
+          fila.dataset.clave = p.clave;
+          fila.dataset.busqueda = (g.nombre + ' ' + p.clave + ' ' + p.descripcion).toLowerCase();
+
+          var chk = document.createElement('input');
+          chk.type = 'checkbox';
+          chk.className = 'perm-check';
+          var estado = estadoDe(p.clave, ajustes[p.clave]);
+          chk.checked = estado === 'marcado';
+          chk.indeterminate = estado === 'heredado';
+          chk.disabled = String(permRol).toLowerCase() === 'admin' && p.clave === 'roles.administrar';
+          if (chk.disabled) chk.title = 'El Administrador siempre conserva este permiso.';
+          chk.addEventListener('change', function () {
+            var nuevo = this.checked ? 'marcado' : 'desmarcado';
+            actualizarCheck(chk, etq, nuevo, p.clave);
+          });
+
+          var nom = document.createElement('div');
+          nom.className = 'perm-nombre';
+          nom.innerHTML = '<div class="perm-clave">' + esc(p.clave) + '</div>' +
+                          '<div class="perm-desc">' + esc(p.descripcion) + '</div>';
+
+          var etq = document.createElement('div');
+          etq.className = 'perm-estado';
+          actualizarCheck(chk, etq, estado, p.clave);
+
+          fila.appendChild(chk); fila.appendChild(nom); fila.appendChild(etq);
+          body.appendChild(fila);
+          permFilas.push(fila);
+        });
+        sec.appendChild(body);
+        cont.appendChild(sec);
+      });
+    }
+
+    // ---- buscador de permisos ----
+    document.getElementById('permBusqueda').addEventListener('input', function () {
+      var q = this.value.trim().toLowerCase();
+      permFilas.forEach(function (fila) {
+        var match = !q || fila.dataset.busqueda.indexOf(q) >= 0;
+        fila.style.display = match ? '' : 'none';
+        // Si algún permiso del grupo coincide, mostrar el grupo y expandirlo
+        if (match) fila.closest('.perm-grupo-sec').classList.add('abierto');
+      });
+    });
+
+    // ---- expandir / colapsar todo ----
+    document.getElementById('permExpandirTodo').addEventListener('click', function () {
+      document.querySelectorAll('.perm-grupo-sec').forEach(function (s) { s.classList.add('abierto'); });
+    });
+    document.getElementById('permColapsarTodo').addEventListener('click', function () {
+      document.querySelectorAll('.perm-grupo-sec').forEach(function (s) { s.classList.remove('abierto'); });
+    });
+
+    document.getElementById('btnGuardarPermisos').addEventListener('click', function () {
+      var boton = this;
+      ocultarError(document.getElementById('errPermisos'));
+      var ajustes = [];
+      document.querySelectorAll('#permCuerpo .perm-check:not(:disabled)').forEach(function (chk) {
+        var fila = chk.closest('.perm-fila');
+        var clave = fila.dataset.clave;
+        var estado = chk.checked ? 'marcado' : (chk.indeterminate ? 'heredado' : 'desmarcado');
+        if (estado === 'marcado') ajustes.push({ clave: clave, concedido: true });
+        else if (estado === 'desmarcado') ajustes.push({ clave: clave, concedido: false });
+      });
+      boton.disabled = true;
+      api('/' + encodeURIComponent(permUsuario) + '/permisos', { method: 'PUT', body: JSON.stringify({ ajustes: ajustes }) })
+        .then(function () { dlgPermisos.close(); })
+        .catch(function (e) { mostrarError(document.getElementById('errPermisos'), e.message); })
+        .finally(function () { boton.disabled = false; });
+    });
+
+    // ---- acciones de la tabla ----
+    cuerpo.addEventListener('click', function (ev) {
+      var btn = ev.target.closest('button[data-accion]');
+      if (!btn) return;
+      var tr = btn.closest('tr');
+      var usuario = tr.dataset.usuario;
+      if (btn.dataset.accion === 'permisos') abrirPermisos(usuario);
+      else if (btn.dataset.accion === 'editar')
+        cargarBuzones().then(function () {
+          var regiones = tr.dataset.regiones ? JSON.parse(tr.dataset.regiones) : [];
+          abrirEditar(usuario, tr.dataset.rol, tr.dataset.activo === '1', tr.dataset.nombre, tr.dataset.cargo,
+            regiones, tr.dataset.vertodas === '1');
+          rellenarBuzonEdicion(usuario);
+        });
+      else if (btn.dataset.accion === 'alternar') {
+        api('/' + encodeURIComponent(usuario) + '/activo', { method: 'PUT', body: JSON.stringify({ activo: tr.dataset.activo !== '1' }) })
+          .then(cargar).catch(function (e) { alert(e.message); });
+      } else if (btn.dataset.accion === 'eliminar') {
+        if (!confirm('¿Eliminar el usuario "' + usuario + '"? Esta acción no se puede deshacer.')) return;
+        api('/' + encodeURIComponent(usuario), { method: 'DELETE' }).then(cargar).catch(function (e) { alert(e.message); });
+      }
+    });
+
+    [dlgCrear, dlgEditar, dlgPermisos].forEach(function (d) {
+      d.addEventListener('click', function (ev) { if (ev.target.closest('[data-cerrar]')) d.close(); });
+    });
+
+    // Identidad y estado del almacén en la cabecera.
+    apiAbs('/api/patologia/me')
+      .then(function (me) { document.getElementById('badgeUsuario').textContent = me.usuario + ' · ' + nombreRol(me.rol); })
+      .catch(function () { document.getElementById('badgeUsuario').textContent = ''; });
+    fetch('/api/status', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
+      .then(function (st) {
+        var items = st.items || st;
+        var linea = Array.isArray(items) ? items.find(function (i) { return (i.name || '').indexOf('almac') >= 0; }) : null;
+        document.getElementById('storeLabel').textContent = linea ? linea.label : 'n/d';
+        if (linea && linea.state === 'warn') document.getElementById('avisoDegradado').hidden = false;
+      })
+      .catch(function () { document.getElementById('storeLabel').textContent = 'n/d'; });
+
+    cargarRoles().then(cargarBuzones).then(cargarRegiones).then(cargar);
+  })();
+  </script>
+<script src="/js/ubicacion.js"></script>
+</body>
+</html>

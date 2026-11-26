@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <script src="/js/theme.js?v=20261119e"></script>
+  <script src="/js/filtro.js?v=20261029a"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reportes · Histórico de actividades — Intranet meditechnosys</title>
+  <link rel="stylesheet" href="/css/panel.css?v=20261123a" />
+  <script src="/js/reportes-tabs.js?v=20261104d" defer></script>
+  <style>
+    .resumen { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin: 0 0 18px; }
+    .ing-card { border: 1px solid var(--borde); border-radius: 8px; background: #fff; padding: 10px 12px; }
+    .ing-card h4 { margin: 0 0 8px; font-size: 14px; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid var(--dorado); padding-bottom: 6px; }
+    .ing-card .lineas { display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; font-size: .82rem; color: var(--suave); }
+    .ing-card .lineas b { color: var(--texto); font-variant-numeric: tabular-nums; }
+    tbody tr { cursor: pointer; }
+    .col-num { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .sin-res { grid-column: 1 / -1; }
+  </style>
+  <link rel="stylesheet" href="/css/theme.css?v=20261120f" />
+  <link rel="stylesheet" href="/css/hoja-fecha.css?v=20261104c" />
+</head>
+<body class="theme-panel">
+  <header>
+    <h1>Reportes</h1>
+    <div class="logo-centro">Meditechnosys<span>Medical Technology Solutions</span></div>
+    <span class="badge" id="badgeUsuario">…</span>
+    <div class="botones-nav">
+      <button class="boton-nav" id="btnRegresar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Regresar
+      </button>
+      <button class="boton-nav" onclick="window.location.href='/'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Home
+      </button>
+    </div>
+  </header>
+  <div class="fondo-logo" aria-hidden="true"></div>
+
+  <main class="page-wide">
+    <nav class="reportes-tabs" data-reportes-activo="historico" aria-label="Apartados de Reportes">
+      <a class="reportes-tab" href="/gestion/historico/index.html" aria-current="page">Histórico de actividades</a>
+    </nav>
+    <section class="card">
+      <h2>Actividades, incidentes y tickets por ingeniero</h2>
+      <p class="hint" style="margin-top:0">
+        Este es el único punto de consulta: los tres tipos de elemento se distinguen con el filtro <b>Tipo</b>
+        y se clasifican por <b>Hospital</b>.
+      </p>
+
+      <div class="filtros">
+        <label>Buscar
+          <input id="fTexto" type="search" placeholder="Título, descripción, #ticket u hospital">
+        </label>
+        <label>Hospital
+          <select id="fHospital"><option value="">Todos</option></select>
+        </label>
+        <label>Tipo
+          <select id="fTipo"><option value="">Todos</option></select>
+        </label>
+        <label>Ingeniero
+          <select id="fIngeniero"><option value="">Todos</option></select>
+        </label>
+        <label>Registró
+          <select id="fCreador"><option value="">Todos</option></select>
+        </label>
+        <label>Estatus
+          <select id="fEstado"><option value="">Todos</option></select>
+        </label>
+        <label>Prioridad
+          <select id="fPrioridad"><option value="">Todas</option></select>
+        </label>
+        <label>Fecha de referencia
+          <select id="fCampoFecha">
+            <option value="fecha">Inicio</option>
+            <option value="asignado">Asignación</option>
+            <option value="fechaLimite" data-requiere-limite="1">Límite</option>
+            <option value="finalizacion">Finalización</option>
+          </select>
+        </label>
+        <label>Desde
+          <input id="fDesde" type="date">
+        </label>
+        <label>Hasta
+          <input id="fHasta" type="date">
+        </label>
+      </div>
+      <div class="row-actions" style="margin-top:0">
+        <button class="btn-secondary" id="btnLimpiar">Limpiar filtros</button>
+        <button class="btn-primary" id="btnExcel" hidden>Descargar Excel</button>
+        <span class="hint" id="contador">…</span>
+      </div>
+
+      <p class="form-error" id="error" role="alert" hidden></p>
+
+      <h2 style="margin-top:22px">Resumen por ingeniero</h2>
+      <div class="resumen" id="resumen"></div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr id="encabezado">
+              <th>Elemento</th><th>Tipo</th><th>Hospital</th><th>Ingeniero</th><th>Inicio</th>
+              <th data-limite="1">Límite</th><th>Prioridad</th><th>Estatus</th><th>Avance</th>
+            </tr>
+          </thead>
+          <tbody id="cuerpo"></tbody>
+        </table>
+      </div>
+      <p class="empty" id="vacio" hidden>No hay elementos que coincidan con los filtros.</p>
+    </section>
+  </main>
+
+  <script src="/js/gestion.js?v=20261123a"></script>
+  <script src="/js/hoja-fecha.js?v=20261106a"></script>
+  <script>
+  (function () {
+    'use strict';
+    // Regla de búsqueda compartida (/js/filtro.js): compara sin acentos ni mayúsculas.
+    var Busca = window.Filtro || { norm: function (x) { return String(x == null ? '' : x).toLowerCase(); } };
+    var todo = [];
+    var cuerpo = document.getElementById('cuerpo');
+    var error = document.getElementById('error');
+    var vacio = document.getElementById('vacio');
+    var resumen = document.getElementById('resumen');
+    var contador = document.getElementById('contador');
+    var btnExcel = document.getElementById('btnExcel');
+    var F = {
+      texto: document.getElementById('fTexto'),
+      hospital: document.getElementById('fHospital'),
+      tipo: document.getElementById('fTipo'),
+      ingeniero: document.getElementById('fIngeniero'),
+      creador: document.getElementById('fCreador'),
+      estado: document.getElementById('fEstado'),
+      prioridad: document.getElementById('fPrioridad'),
+      campoFecha: document.getElementById('fCampoFecha'),
+      desde: document.getElementById('fDesde'),
+      hasta: document.getElementById('fHasta')
+    };
+
+    // «Desde» y «Hasta» se eligen con la hoja compartida (/js/hoja-fecha.js): Día, Mes, Año
+    // o Rango en un solo cuadro. Escribe yyyy-mm-dd en los dos campos (los dos incluidos) y
+    // dispara change, así que el filtrado y el Excel de abajo no cambian. El periodo se
+    // aplica sobre la «Fecha de referencia» que esté seleccionada.
+    if (window.HojaFecha) {
+      HojaFecha.instalar({ desde: F.desde, hasta: F.hasta, titulo: 'Periodo', cualquier: 'Cualquier día' });
+    }
+
+    function llenarSelect(sel, valores) {
+      valores.forEach(function (v) {
+        var o = document.createElement('option'); o.value = v.v !== undefined ? v.v : v; o.textContent = v.t !== undefined ? v.t : v;
+        sel.appendChild(o);
+      });
+    }
+    function valorFecha(a, campo) {
+      if (campo === 'finalizacion') return a.cerrado;
+      return a[campo];
+    }
+    // Mismos criterios que aplica el servidor al generar el Excel.
+    function filtrar() {
+      var t = Busca.norm(F.texto.value.trim());
+      var hos = F.hospital.value, ing = F.ingeniero.value, tipo = F.tipo.value, est = F.estado.value;
+      var prio = F.prioridad.value, creador = F.creador.value;
+      var campo = F.campoFecha.value, desde = F.desde.value, hasta = F.hasta.value;
+      return todo.filter(function (a) {
+        if (t) {
+          var heno = Busca.norm(a.etiqueta + ' ' + (a.descripcion || '') + ' ' + (a.usuario || '') + ' ' +
+            (a.creadoPor || '') + ' ' + (a.hospital || ''));
+          if (heno.indexOf(t) < 0) return false;
+        }
+        if (hos && (a.hospital || '') !== hos) return false;
+        if (ing && (a.usuario || '') !== ing) return false;
+        if (creador && (a.creadoPor || '') !== creador) return false;
+        if (tipo && a.tipo !== tipo) return false;
+        if (est === 'Vencida') { if (!a.vencida) return false; }
+        else if (est && a.estado !== est) return false;
+        if (prio && a.prioridad !== prio) return false;
+        if (desde || hasta) {
+          var v = valorFecha(a, campo);
+          if (!v) return false;
+          var d = v.slice(0, 10);
+          if (desde && d < desde) return false;
+          if (hasta && d > hasta) return false;
+        }
+        return true;
+      });
+    }
+
+    // Cadena de consulta con los filtros activos (la usa la descarga de Excel).
+    function query() {
+      var p = [];
+      function add(k, v) { if (v) p.push(encodeURIComponent(k) + '=' + encodeURIComponent(v)); }
+      add('texto', F.texto.value.trim());
+      add('hospital', F.hospital.value);
+      add('ingeniero', F.ingeniero.value);
+      add('tipo', F.tipo.value);
+      add('estado', F.estado.value);
+      add('prioridad', F.prioridad.value);
+      add('creadoPor', F.creador.value);
+      add('campoFecha', F.campoFecha.value);
+      add('desde', F.desde.value);
+      add('hasta', F.hasta.value);
+      return p.length ? '?' + p.join('&') : '';
+    }
+
+    function pintarResumen(lista) {
+      resumen.innerHTML = '';
+      var porIng = {};
+      lista.forEach(function (a) {
+        var k = a.usuario || '(sin asignar)';
+        (porIng[k] = porIng[k] || { asignadas: 0, pendientes: 0, terminadas: 0, canceladas: 0, vencidas: 0, tickets: 0, incidentes: 0 });
+        var g = porIng[k];
+        g.asignadas++;
+        if (a.estado === 'Pendiente') g.pendientes++;
+        if (a.estado === 'Completada') g.terminadas++;
+        if (a.estado === 'Cancelada') g.canceladas++;
+        if (a.vencida) g.vencidas++;
+        if (a.tipo === 'Ticket') g.tickets++;
+        if (a.tipo === 'Incidente') g.incidentes++;
+      });
+      var nombres = Object.keys(porIng).sort();
+      if (!nombres.length) { resumen.innerHTML = '<p class="hint sin-res">Sin datos para el filtro actual.</p>'; return; }
+      nombres.forEach(function (n) {
+        var g = porIng[n];
+        var c = document.createElement('div'); c.className = 'ing-card';
+        c.innerHTML = '<h4></h4><div class="lineas">' +
+          '<span>Asignadas</span><b>' + g.asignadas + '</b>' +
+          '<span>Pendientes</span><b>' + g.pendientes + '</b>' +
+          '<span>Completadas</span><b>' + g.terminadas + '</b>' +
+          '<span>Canceladas</span><b>' + g.canceladas + '</b>' +
+          (Gestion.usaFechaLimite() ? '<span>Vencidas</span><b>' + g.vencidas + '</b>' : '') +
+          '<span>Tickets</span><b>' + g.tickets + '</b>' +
+          '<span>Incidentes</span><b>' + g.incidentes + '</b>' +
+          '</div>';
+        c.querySelector('h4').textContent = n;
+        resumen.appendChild(c);
+      });
+    }
+
+    function pintarTabla(lista) {
+      cuerpo.innerHTML = '';
+      vacio.hidden = lista.length > 0;
+      contador.textContent = lista.length + ' elemento(s)';
+      var conLimite = Gestion.usaFechaLimite();
+      lista.forEach(function (a) {
+        var tr = document.createElement('tr');
+        tr.dataset.id = a.id;
+        tr.innerHTML =
+          '<td></td><td></td><td></td><td></td><td class="col-num"></td>' +
+          (conLimite ? '<td class="col-num"></td>' : '') + '<td></td><td></td><td></td>';
+        var c = tr.children, i = 0;
+        c[i++].textContent = a.etiqueta;
+        c[i++].innerHTML = Gestion.badgeTipo(a.tipo);
+        c[i++].textContent = a.hospital || '(sin hospital)';
+        c[i++].textContent = a.usuario || '(sin asignar)';
+        c[i++].textContent = Gestion.fmtFecha(a.fecha);
+        if (conLimite) c[i++].textContent = a.fechaLimite ? Gestion.fmtFecha(a.fechaLimite) : '—';
+        c[i++].innerHTML = Gestion.badgePrioridad(a.prioridad);
+        c[i++].innerHTML = Gestion.badgeEstado(a);
+        c[i++].innerHTML = Gestion.avanceHtml(a.avance);
+        cuerpo.appendChild(tr);
+      });
+    }
+
+    // Con la fecha límite deshabilitada no se muestra ni se filtra por ella (es del Admin).
+    function aplicarVisibilidadLimite() {
+      var activa = Gestion.usaFechaLimite();
+      Array.prototype.forEach.call(document.querySelectorAll('[data-limite]'), function (el) { el.hidden = !activa; });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-requiere-limite]'), function (el) { el.hidden = !activa; });
+      if (!activa && F.campoFecha.value === 'fechaLimite') F.campoFecha.value = 'fecha';
+    }
+
+    function repintar() {
+      var lista = filtrar();
+      pintarResumen(lista);
+      pintarTabla(lista);
+    }
+
+    Object.keys(F).forEach(function (k) {
+      F[k].addEventListener(k === 'texto' ? 'input' : 'change', repintar);
+    });
+    document.getElementById('btnLimpiar').addEventListener('click', function () {
+      Object.keys(F).forEach(function (k) { F[k].value = k === 'campoFecha' ? 'fecha' : ''; });
+      repintar();
+    });
+    btnExcel.addEventListener('click', function () {
+      Gestion.sinError(error);
+      btnExcel.disabled = true;
+      Gestion.descargar('/api/historico/excel' + query())
+        .catch(function (e) { Gestion.error(error, 'No se pudo generar el Excel: ' + e.message); })
+        .finally(function () { btnExcel.disabled = false; });
+    });
+
+    cuerpo.addEventListener('click', function (ev) {
+      var tr = ev.target.closest('tr[data-id]');
+      if (!tr) return;
+      var item = todo.find(function (x) { return String(x.id) === tr.dataset.id; });
+      if (item) Gestion.abrirDetalle(item, { onReload: cargar });
+    });
+
+    function cargar() {
+      return Gestion.api('/api/actividades').then(function (lista) {
+        todo = lista || [];
+        repintar();
+      }).catch(function (e) { Gestion.error(error, 'No se pudo cargar el histórico: ' + e.message); });
+    }
+
+    Gestion.init().then(function () {
+      document.getElementById('btnRegresar').addEventListener('click', function () {
+        window.location.href = Gestion.paginaRegreso();
+      });
+      document.getElementById('badgeUsuario').textContent =
+        Gestion.YO + ' · ' + Gestion.nombreRol(Gestion.ROL);
+      if (!Gestion.tiene('historico.actividades')) {
+        Gestion.error(error, 'No tienes permiso para ver el Histórico de actividades.');
+        document.querySelectorAll('.filtros, .row-actions, .table-wrap, .resumen').forEach(function (el) { el.hidden = true; });
+        return Promise.reject(new Error('__sinacceso__'));
+      }
+      llenarSelect(F.hospital, Gestion.opcionesHospital({ vacio: null }));
+      llenarSelect(F.tipo, Gestion.TIPOS);
+      llenarSelect(F.estado, Gestion.ORDEN_ESTADOS.map(function (e) { return { v: e, t: Gestion.ESTADOS[e] }; })
+        .concat(Gestion.usaFechaLimite() ? [{ v: 'Vencida', t: 'Vencida (abierta fuera de tiempo)' }] : []));
+      llenarSelect(F.prioridad, Gestion.PRIORIDADES);
+      btnExcel.hidden = !Gestion.tiene('historico.exportar');
+      aplicarVisibilidadLimite();
+      return Gestion.api('/api/usuarios/asignables').catch(function () { return []; });
+    }).then(function (usuarios) {
+      return cargar().then(function () {
+        var nombres = {}, autores = {};
+        (usuarios || []).forEach(function (u) { if (u && u.usuario) nombres[u.usuario] = 1; });
+        todo.forEach(function (a) {
+          if (a.usuario) nombres[a.usuario] = 1;
+          if (a.creadoPor) { nombres[a.creadoPor] = 1; autores[a.creadoPor] = 1; }
+        });
+        Object.keys(nombres).sort().forEach(function (n) { llenarSelect(F.ingeniero, [{ v: n, t: n }]); });
+        Object.keys(autores).sort().forEach(function (n) { llenarSelect(F.creador, [{ v: n, t: n }]); });
+      });
+    }).catch(function (e) { if (e && e.message === '__sinacceso__') return; Gestion.error(error, e.message); });
+  })();
+  </script>
+<script src="/js/ubicacion.js"></script>
+</body>
+</html>

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <script src="/js/theme.js?v=20261119e"></script>
+  <script src="/js/filtro.js?v=20261029a"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Inventario de equipos — Intranet meditechnosys</title>
+  <link rel="stylesheet" href="/css/panel.css?v=20261123a" />
+  <style>
+    .col-num { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .acciones-fila { display: flex; gap: 6px; flex-wrap: wrap; }
+    .acciones-fila button { padding: 4px 8px; font-size: 12px; }
+    .tab-unica { display: inline-block; padding: 8px 16px; background: var(--azul); border-color: var(--azul); color: #fff; font-weight: 700; border-radius: 6px; margin: 0 0 14px; }
+  </style>
+  <link rel="stylesheet" href="/css/theme.css?v=20261120f" />
+</head>
+<body class="theme-panel">
+  <header>
+    <h1>Inventario de equipos</h1>
+    <div class="logo-centro">Meditechnosys<span>Medical Technology Solutions</span></div>
+    <span class="badge" id="badgeUsuario">…</span>
+    <div class="botones-nav">
+      <button class="boton-nav" id="btnRegresar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Regresar
+      </button>
+      <button class="boton-nav" onclick="window.location.href='/'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Home
+      </button>
+    </div>
+  </header>
+  <div class="fondo-logo" aria-hidden="true"></div>
+
+  <main class="page-wide">
+    <section class="card">
+      <!-- Pestaña única: Ingresos -->
+      <span class="tab-unica">Ingresos</span>
+      <p class="form-error" id="error" role="alert" hidden></p>
+
+      <h2>Ingresos de equipos</h2>
+      <div class="filtros">
+        <label>Unidad
+          <!-- Se llena con el catálogo del servidor (ver `unidades()` más abajo): los hospitales que
+               le tocan al usuario según su región, más «General», que en esta pantalla se llama
+               «Almacén». Ya no es una lista fija escrita aquí. -->
+          <select id="fUnidad"></select>
+        </label>
+        <label>Buscar<input id="fTexto" type="search" placeholder="N.º inventario, serie, nombre, marca…"></label>
+      </div>
+      <div class="row-actions">
+        <button class="btn-primary" id="bNuevo" hidden>+ Añadir equipo</button>
+        <button class="btn-primary" id="bExcel" hidden>Descargar Excel</button>
+        <span class="hint" id="fContador">…</span>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>N.º inv.</th><th>Nombre</th><th>Marca</th><th>Modelo</th><th>Serie</th>
+          <th>Unidad</th><th>Cant.</th><th>Estado</th><th>Hojas / acciones</th>
+        </tr></thead>
+        <tbody id="cuerpo"></tbody>
+      </table></div>
+      <p class="empty" id="vacio" hidden>No hay equipos en esta unidad.</p>
+    </section>
+  </main>
+
+  <script src="/js/gestion.js?v=20261123a"></script>
+  <script>
+  (function () {
+    'use strict';
+    var lotes = [];
+    var entradas = [];   // movimientos de Entrada, para localizar la hoja de entrada de cada lote
+    var error = document.getElementById('error');
+    // Regla de búsqueda compartida (/js/filtro.js): compara sin acentos ni mayúsculas.
+    var Busca = window.Filtro || { norm: function (x) { return String(x == null ? '' : x).toLowerCase(); } };
+    // ---------- unidades y servicios (catálogo del servidor) ----------
+    // Las opciones vienen de `/api/permisos/mios`, que ya acotó los hospitales a la región asignada
+    // al usuario (Gestion.HOSPITALES_CON_GENERAL). «General» no es un hospital de ninguna región: es
+    // el almacén central y se sigue ofreciendo a todos, con el nombre que usa esta pantalla.
+    function unidades() {
+      var lista = Gestion.opcionesHospital({ general: true, vacio: null }).map(function (o) {
+        return { v: o.v, t: o.v === 'General' ? 'Almacén' : o.t };
+      });
+      return lista.filter(function (u) { return u.v === 'General'; })
+        .concat(lista.filter(function (u) { return u.v !== 'General'; }));
+    }
+    function nombreUnidad(v) { return v === 'General' ? 'Almacén' : (v || '—'); }
+    // Opciones del desplegable de unidad para un equipo ya registrado: si su unidad no está en el
+    // catálogo (código antiguo o viene vacía) se agrega tal como está, para que editar el equipo no
+    // lo mueva por detrás a la primera opción de la lista.
+    function opcionesUnidad(valor) {
+      var ops = unidades();
+      if (valor && !ops.some(function (u) { return u.v === valor; }))
+        ops = ops.concat([{ v: valor, t: valor + ' (sin catálogo)' }]);
+      if (!valor) ops = [{ v: '', t: '(sin unidad registrada)' }].concat(ops);
+      return ops;
+    }
+    function unidadActual() { return document.getElementById('fUnidad').value; }
+    function pintaFiltroUnidad() {
+      var sel = document.getElementById('fUnidad');
+      sel.innerHTML = '';
+      unidades().forEach(function (u) {
+        var op = document.createElement('option'); op.value = u.v; op.textContent = u.t;
+        sel.appendChild(op);
+      });
+    }
+
+    // ¿El Programador configuró algún servicio (por hospital o en la lista general)? Con el catálogo
+    // de servicios vacío no hay nada que ofrecer, así que el campo sigue siendo de texto libre para
+    // no dejar a nadie sin forma de capturarlo.
+    function hayServicios() {
+      if ((Gestion.CATALOGO.servicios || []).some(function (s) { return !!s; })) return true;
+      var mapa = Gestion.CATALOGO.serviciosPorHospital || {};
+      return Object.keys(mapa).some(function (h) {
+        return (mapa[h] || []).some(function (s) { return !!s; });
+      });
+    }
+    // Servicios de la unidad elegida, con el valor ya guardado arriba si el catálogo no lo conoce:
+    // así editar un equipo nunca borra, sin avisar, el servicio que traía escrito.
+    function opcionesServicio(unidad, guardado) {
+      var lista = Gestion.serviciosDe(unidad);
+      var ops = [{ v: '', t: '(Sin servicio)' }];
+      if (guardado && !lista.some(function (s) { return s.toLowerCase() === guardado.toLowerCase(); }))
+        ops.push({ v: guardado, t: guardado + ' (ya no está en el catálogo)' });
+      return ops.concat(lista.map(function (s) { return { v: s, t: s }; }));
+    }
+    // Campo «Servicio / departamento»: desplegable con los servicios que existen cuando hay catálogo
+    // (y oculto si la unidad no tiene ninguno, igual que en + Nuevo del calendario); texto libre
+    // cuando el Programador todavía no configuró servicios.
+    function campoServicio(unidad, guardado) {
+      guardado = guardado || '';
+      if (!hayServicios()) return { name: 'servicio', label: 'Servicio / departamento', value: guardado };
+      var c = {
+        name: 'servicio', label: 'Servicio / departamento', tipo: 'select',
+        opciones: opcionesServicio(unidad, guardado), value: guardado,
+        ocultoInicial: !Gestion.serviciosDe(unidad).length && !guardado
+      };
+      return c;
+    }
+    // Cambiar de unidad cambia los servicios que se pueden elegir. El valor se vuelve a buscar en la
+    // lista nueva; si no estaba, se conserva como opción propia para no perder lo ya capturado.
+    function ajustarServicio(api, unidad) {
+      if (!hayServicios()) return;
+      var guardado = api.get('servicio');
+      api.opciones('servicio', opcionesServicio(unidad, guardado));
+      api.set('servicio', guardado);
+      api.mostrar('servicio', Gestion.serviciosDe(unidad).length > 0 || !!guardado);
+    }
+
+    // ---------- carga ----------
+    function cargar() {
+      return Promise.all([
+        Gestion.api('/api/almacen/existencias?hospital=' + encodeURIComponent(unidadActual())),
+        Gestion.api('/api/almacen/movimientos?tipo=Entrada')
+      ]).then(function (r) {
+        lotes = r[0] || [];
+        entradas = r[1] || [];
+        pintar();
+      });
+    }
+    function filtrar() {
+      var t = Busca.norm(document.getElementById('fTexto').value.trim());
+      if (!t) return lotes;
+      return lotes.filter(function (i) {
+        return Object.keys(i.datos || {}).some(function (k) { return Busca.norm(i.datos[k]).indexOf(t) >= 0; });
+      });
+    }
+    // Localiza el movimiento de entrada de un lote: por docEntrada sellado, por equipoId,
+    // o (respaldo) por serie / n.º de inventario / nombre para lotes dados de alta a mano.
+    function docEntradaDe(i) {
+      if (i.datos && i.datos.docEntrada) return i.datos.docEntrada;
+      var d = i.datos || {};
+      for (var k = entradas.length - 1; k >= 0; k--) {
+        var m = entradas[k];
+        var hit = (m.detalles || []).some(function (dd) {
+          if (dd.equipoId && String(dd.equipoId) === String(i.id)) return true;
+          if (d.serie && dd.serie && dd.serie === d.serie) return true;
+          if (d.numInventario && dd.numInventario && dd.numInventario === d.numInventario) return true;
+          if (dd.nombre && d.nombre && dd.nombre === d.nombre && !d.serie && !dd.serie) return true;
+          return false;
+        });
+        if (hit) return m.id;
+      }
+      return null;
+    }
+
+    function pintar() {
+      var lista = filtrar();
+      var cuerpo = document.getElementById('cuerpo');
+      cuerpo.innerHTML = '';
+      document.getElementById('vacio').hidden = lista.length > 0;
+      document.getElementById('fContador').textContent = lista.length + ' equipo(s)';
+      lista.forEach(function (i) {
+        var d = i.datos || {};
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td></td><td></td><td></td><td></td><td></td><td></td><td class="col-num"></td><td></td><td class="acciones-fila"></td>';
+        var c = tr.children;
+        c[0].textContent = d.numInventario || '—';
+        c[1].textContent = d.nombre || '';
+        c[2].textContent = d.marca || '—';
+        c[3].textContent = d.modelo || '—';
+        c[4].textContent = d.serie || '—';
+        c[5].textContent = nombreUnidad(i.hospital);
+        c[6].textContent = d.cantidad || '0';
+        c[7].textContent = d.estado || '';
+        var acc = c[8];
+        var de = docEntradaDe(i);
+        if (de) { var be = document.createElement('button'); be.type = 'button'; be.textContent = 'Hoja entrada'; be.dataset.entrada = de; acc.appendChild(be); }
+        var bs = document.createElement('button'); bs.type = 'button'; bs.textContent = 'Hoja salida'; bs.dataset.salida = i.id; acc.appendChild(bs);
+        if (Gestion.tiene('almacen.registrar')) { var be2 = document.createElement('button'); be2.type = 'button'; be2.textContent = 'Editar'; be2.dataset.edit = i.id; acc.appendChild(be2); }
+        cuerpo.appendChild(tr);
+      });
+    }
+
+    // ---------- añadir equipo (crea lote + entrada + hoja) ----------
+    function abrirNuevo() {
+      var cats = ['Imagenología', 'Laboratorio', 'Cómputo', 'Red', 'Vida soporte', 'Otro'];
+      var estados = ['Activo', 'Disponible', 'Asignado', 'En mantenimiento', 'Fuera de servicio', 'Baja'];
+      Gestion.formDialog({
+        titulo: 'Añadir equipo',
+        intro: 'Captura el equipo y su cantidad; se crea el lote en la unidad elegida, se genera automáticamente su número de inventario y se genera su hoja de entrada.',
+        ancho: true,
+        campos: [
+          { name: 'unidad', label: 'Unidad', tipo: 'select', required: true, opciones: unidades(), value: unidadActual(),
+            onCambio: function (valor, api) { ajustarServicio(api, valor); } },
+          { name: 'nombre', label: 'Nombre del equipo', required: true },
+          { name: 'categoria', label: 'Categoría', tipo: 'select', opciones: cats.map(function (x) { return { v: x, t: x }; }), value: 'Otro' },
+          { name: 'marca', label: 'Marca' },
+          { name: 'modelo', label: 'Modelo' },
+          { name: 'serie', label: 'Número de serie' },
+          { name: 'cantidad', label: 'Cantidad', tipo: 'number', min: 1, value: '1' },
+          campoServicio(unidadActual(), ''),
+          { name: 'ubicacion', label: 'Ubicación / almacén' },
+          { name: 'estado', label: 'Estado', tipo: 'select', opciones: estados.map(function (x) { return { v: x, t: x }; }), value: 'Disponible' },
+          { name: 'procedencia', label: 'Procedencia' },
+          { name: 'notas', label: 'Notas', tipo: 'textarea' }
+        ],
+        textoSubmit: 'Añadir y generar hoja de entrada',
+        onSubmit: function (v) {
+          var cant = parseInt(v.cantidad, 10) || 0;
+          if (cant <= 0) return Promise.reject(new Error('La cantidad debe ser mayor a cero.'));
+          var ubic = v.ubicacion || (v.unidad === 'General' ? 'Almacén central' : v.unidad);
+          var datos = {
+            nombre: v.nombre, categoria: v.categoria, marca: v.marca, modelo: v.modelo,
+            serie: v.serie, numInventario: '', cantidad: '0',
+            servicio: v.servicio || '', ubicacion: ubic, estado: v.estado,
+            procedencia: v.procedencia, notas: v.notas, docEntrada: '',
+            fechaIngreso: new Date().toISOString().slice(0, 10)
+          };
+          // 1) lote en cero (el servidor le asigna el n.º de inventario)  2) movimiento de entrada
+          // 3) confirmar (aplica stock)  4) sellar docEntrada y cantidad  5) hoja
+          return Gestion.api('/api/inventario/equipos', { method: 'POST', body: JSON.stringify({ hospital: v.unidad, datos: datos }) })
+            .then(function (lote) {
+              var numInv = (lote.datos && lote.datos.numInventario) || '';
+              return Gestion.api('/api/almacen/movimientos', {
+                method: 'POST',
+                body: JSON.stringify({
+                  tipo: 'Entrada', motivo: 'Recepción de equipo nuevo',
+                  hospitalDestino: v.unidad, ubicacionDestino: ubic,
+                  observaciones: v.notas || '',
+                  detalles: [{ equipoId: lote.id, numInventario: numInv, serie: v.serie, nombre: v.nombre, marca: v.marca, modelo: v.modelo, cantidad: cant }]
+                })
+              }).then(function (mov) { return { lote: lote, mov: mov }; });
+            })
+            .then(function (r) {
+              return Gestion.api('/api/almacen/movimientos/' + r.mov.id + '/confirmar', { method: 'PUT' }).then(function () { return r; });
+            })
+            .then(function (r) {
+              var d2 = Object.assign({}, r.lote.datos, { docEntrada: String(r.mov.id), cantidad: String(cant) });
+              return Gestion.api('/api/inventario/equipos/' + r.lote.id, { method: 'PUT', body: JSON.stringify({ hospital: v.unidad, datos: d2 }) }).then(function () { return r.mov.id; });
+            })
+            .then(function (movId) { window.open('/almacen/hoja.html?id=' + movId, '_blank'); return cargar(); });
+        }
+      });
+    }
+
+    // ---------- hoja de salida por fila (descuenta y genera hoja) ----------
+    function abrirSalida(lote) {
+      var d = lote.datos || {};
+      var stock = parseInt(d.cantidad, 10) || 0;
+      var motivos = ['Asignación a un servicio del hospital', 'Envío a otro almacén autorizado', 'Envío a otro hospital', 'Envío a proveedor o taller de mantenimiento', 'Desecho / baja definitiva', 'Otro'];
+      var destinos = unidades().filter(function (u) { return u.v !== lote.hospital; });
+      Gestion.formDialog({
+        titulo: 'Hoja de salida — ' + (d.nombre || ''),
+        intro: 'Stock disponible en ' + nombreUnidad(lote.hospital) + ': ' + stock + '. Al confirmar se descuenta y se genera la hoja de salida.',
+        ancho: true,
+        campos: [
+          { name: 'cantidad', label: 'Cantidad que sale', tipo: 'number', min: 1, max: stock, value: String(Math.min(1, stock)), required: true },
+          { name: 'motivo', label: 'Motivo', tipo: 'select', required: true, opciones: motivos.map(function (x) { return { v: x, t: x }; }) },
+          { name: 'destino', label: 'Unidad de destino (opcional)', tipo: 'select', opciones: [{ v: '', t: '(sin destino / se retira)' }].concat(destinos) },
+          { name: 'respEntrega', label: 'Responsable que entrega' },
+          { name: 'respRecibe', label: 'Responsable que recibe' },
+          { name: 'observaciones', label: 'Observaciones', tipo: 'textarea' }
+        ],
+        textoSubmit: 'Confirmar salida y generar hoja',
+        onSubmit: function (v) {
+          var cant = parseInt(v.cantidad, 10) || 0;
+          if (cant <= 0 || cant > stock) return Promise.reject(new Error('La cantidad debe estar entre 1 y ' + stock + '.'));
+          var esDesecho = v.motivo === 'Desecho / baja definitiva';
+          var ubicOrigen = d.ubicacion || (lote.hospital === 'General' ? 'Almacén central' : lote.hospital);
+          return Gestion.api('/api/almacen/movimientos', {
+            method: 'POST',
+            body: JSON.stringify({
+              tipo: 'Salida', motivo: v.motivo,
+              hospitalOrigen: lote.hospital, ubicacionOrigen: ubicOrigen,
+              hospitalDestino: v.destino || '', ubicacionDestino: v.destino ? (v.destino === 'General' ? 'Almacén central' : v.destino) : '',
+              responsableEntrega: v.respEntrega || '', responsableRecibe: v.respRecibe || '',
+              observaciones: v.observaciones || '',
+              detalles: [{ equipoId: lote.id, numInventario: d.numInventario, serie: d.serie, nombre: d.nombre, marca: d.marca, modelo: d.modelo, cantidad: cant }]
+            })
+          }).then(function (mov) {
+            return Gestion.api('/api/almacen/movimientos/' + mov.id + '/confirmar', { method: 'PUT' }).then(function () { return mov; });
+          }).then(function (mov) {
+            // Si hay destino y no es desecho, se re-ingresa allá mediante una entrada.
+            var reingreso = Promise.resolve();
+            if (v.destino && !esDesecho) {
+              var ubicDest = v.destino === 'General' ? 'Almacén central' : v.destino;
+              reingreso = Gestion.api('/api/almacen/movimientos', {
+                method: 'POST',
+                body: JSON.stringify({
+                  tipo: 'Entrada', motivo: 'Transferencia desde otro almacén u hospital',
+                  hospitalDestino: v.destino, ubicacionDestino: ubicDest,
+                  observaciones: 'Reingreso por salida ' + mov.folio,
+                  detalles: [{ equipoId: lote.id, numInventario: d.numInventario, serie: d.serie, nombre: d.nombre, marca: d.marca, modelo: d.modelo, cantidad: cant }]
+                })
+              }).then(function (m2) { return Gestion.api('/api/almacen/movimientos/' + m2.id + '/confirmar', { method: 'PUT' }); });
+            }
+            return reingreso.then(function () { window.open('/almacen/hoja.html?id=' + mov.id, '_blank'); return cargar(); });
+          });
+        }
+      });
+    }
+
+    // ---------- edición (solo admin) ----------
+    function abrirEditar(lote) {
+      var d = lote.datos || {};
+      var cats = ['Imagenología', 'Laboratorio', 'Cómputo', 'Red', 'Vida soporte', 'Otro'];
+      var estados = ['Activo', 'Disponible', 'Asignado', 'En mantenimiento', 'Fuera de servicio', 'En tránsito', 'Baja'];
+      Gestion.formDialog({
+        titulo: 'Editar equipo',
+        ancho: true,
+        campos: [
+          { name: 'unidad', label: 'Unidad', tipo: 'select', required: true, opciones: opcionesUnidad(lote.hospital), value: lote.hospital,
+            onCambio: function (valor, api) { ajustarServicio(api, valor); } },
+          { name: 'nombre', label: 'Nombre del equipo', required: true, value: d.nombre || '' },
+          { name: 'categoria', label: 'Categoría', tipo: 'select', opciones: cats.map(function (x) { return { v: x, t: x }; }), value: d.categoria || 'Otro' },
+          { name: 'marca', label: 'Marca', value: d.marca || '' },
+          { name: 'modelo', label: 'Modelo', value: d.modelo || '' },
+          { name: 'serie', label: 'Número de serie', value: d.serie || '' },
+          { name: 'numInventario', label: 'Número de inventario', value: d.numInventario || '' },
+          { name: 'cantidad', label: 'Cantidad', tipo: 'number', min: 0, value: d.cantidad || '0' },
+          campoServicio(lote.hospital, d.servicio),
+          { name: 'ubicacion', label: 'Ubicación / almacén', value: d.ubicacion || '' },
+          { name: 'estado', label: 'Estado', tipo: 'select', opciones: estados.map(function (x) { return { v: x, t: x }; }), value: d.estado || 'Disponible' },
+          { name: 'procedencia', label: 'Procedencia', value: d.procedencia || '' },
+          { name: 'notas', label: 'Notas', tipo: 'textarea', value: d.notas || '' }
+        ],
+        textoSubmit: 'Guardar cambios',
+        onSubmit: function (v) {
+          var datos = Object.assign({}, d, {
+            nombre: v.nombre, categoria: v.categoria, marca: v.marca, modelo: v.modelo,
+            serie: v.serie, numInventario: v.numInventario, cantidad: String(v.cantidad),
+            // Un campo oculto llega como `undefined` (formDialog no envía los inactivos): se conserva
+            // lo que ya traía el equipo, en lugar de borrarle el servicio de paso.
+            servicio: v.servicio === undefined ? (d.servicio || '') : v.servicio,
+            ubicacion: v.ubicacion, estado: v.estado,
+            procedencia: v.procedencia, notas: v.notas
+          });
+          return Gestion.api('/api/inventario/equipos/' + lote.id, { method: 'PUT', body: JSON.stringify({ hospital: v.unidad, datos: datos }) }).then(cargar);
+        }
+      });
+    }
+
+    // ---------- eventos ----------
+    document.getElementById('cuerpo').addEventListener('click', function (ev) {
+      var b = ev.target.closest('button');
+      if (!b) return;
+      if (b.dataset.entrada) { window.open('/almacen/hoja.html?id=' + b.dataset.entrada, '_blank'); return; }
+      if (b.dataset.salida) {
+        var lote = lotes.find(function (x) { return String(x.id) === b.dataset.salida; });
+        if (lote) abrirSalida(lote);
+        return;
+      }
+      if (b.dataset.edit) {
+        var l2 = lotes.find(function (x) { return String(x.id) === b.dataset.edit; });
+        if (l2) abrirEditar(l2);
+      }
+    });
+    document.getElementById('fUnidad').addEventListener('change', cargar);
+    document.getElementById('fTexto').addEventListener('input', pintar);
+    document.getElementById('bNuevo').addEventListener('click', abrirNuevo);
+    document.getElementById('bExcel').addEventListener('click', function () {
+      var q = '?hospital=' + encodeURIComponent(unidadActual()) + '&q=' + encodeURIComponent(document.getElementById('fTexto').value.trim());
+      Gestion.descargar('/api/almacen/existencias/excel' + q).catch(function (e) { Gestion.error(error, e.message); });
+    });
+
+    // ---------- init ----------
+    Gestion.init().then(function () {
+      document.getElementById('badgeUsuario').textContent = Gestion.YO + ' · ' + Gestion.nombreRol(Gestion.ROL);
+      document.getElementById('btnRegresar').addEventListener('click', function () { window.location.href = Gestion.paginaRegreso(); });
+      document.getElementById('bNuevo').hidden = !Gestion.tiene('almacen.registrar');
+      document.getElementById('bExcel').hidden = !Gestion.tiene('almacen.exportar');
+      // El filtro de unidad se pinta con el catálogo ya acotado a la región del usuario, antes de la
+      // primera carga: `cargar()` lee la opción seleccionada.
+      pintaFiltroUnidad();
+      cargar().catch(function (e) { Gestion.error(error, e.message); });
+    }).catch(function (e) { Gestion.error(error, e.message); });
+  })();
+  </script>
+<script src="/js/ubicacion.js"></script>
+</body>
+</html>

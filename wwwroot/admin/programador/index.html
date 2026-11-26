@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <script src="/js/theme.js?v=20261119e"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Programador — Intranet meditechnosys</title>
+  <link rel="stylesheet" href="/css/panel.css?v=20261123a" />
+  <style>
+    .bloques { display: grid; gap: 18px; }
+    .bloque { border: 1px solid var(--borde); border-radius: 8px; background: var(--panel-2); padding: 14px 16px; }
+    .bloque h3 { margin: 0 0 4px; font-size: 14px; text-transform: uppercase; letter-spacing: .05em; color: var(--texto); border-bottom: 2px solid var(--dorado); padding-bottom: 6px; }
+    .filas { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+    .fila { display: flex; align-items: center; gap: 8px; }
+    .fila input[type="text"] { flex: 1 1 auto; padding: 8px 10px; font: inherit; }
+    .fila .btn-quitar { flex: 0 0 auto; padding: 6px 10px; }
+    .acciones { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .aviso-ok { border: 1px solid var(--ok); background: rgba(34,197,94,.12); color: #052e16; border-radius: 6px; padding: 8px 12px; font-size: .85rem; margin: 10px 0 0; }
+    .aviso-ok[hidden] { display: none; }
+    .fila-selector { display: flex; align-items: center; gap: 8px; margin: 12px 0 4px; }
+    .fila-selector select { padding: 7px 9px; font: inherit; }
+    .fila-selector .lbl { font-size: 12px; color: var(--suave); text-transform: uppercase; letter-spacing: .05em; }
+    /* Regiones médicas: la lista solo muestra los nombres, uno por renglón, y el panel de hospitales
+       aparece debajo de la región seleccionada. Así se ve de una mirada cuántas regiones hay y cuál se
+       está editando, sin tarjetas abiertas a la vez. La barra dorada del renglón activo es la misma del
+       resto de la pantalla. */
+    .fichas { display: flex; flex-direction: column; gap: 12px; margin: 12px 0; }
+    .region-lista { display: flex; flex-direction: column; gap: 6px; }
+    .region-fila {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      border: 1px solid var(--borde); border-left: 3px solid transparent;
+      border-radius: 8px; padding: 7px 10px;
+    }
+    .region-fila.activa { border-left-color: var(--dorado); background: var(--panel-2); }
+    .region-fila input { flex: 1 1 220px; min-width: 0; }
+    .region-cuenta { font-size: .78rem; color: var(--muted); white-space: nowrap; }
+    .region-panel { border: 1px dashed var(--borde); border-radius: 8px; padding: 10px 12px; }
+    .region-panel .lbl { display: block; font-size: 11px; color: var(--suave); text-transform: uppercase; letter-spacing: .05em; margin: 0 0 2px; }
+    .region-panel .filas { margin: 8px 0 6px; }
+    .region-panel .vacia { margin: 8px 0 0; }
+  </style>
+  <link rel="stylesheet" href="/css/theme.css?v=20261120f" />
+</head>
+<body class="theme-panel">
+  <header>
+    <h1>Programador</h1>
+    <div class="logo-centro">Meditechnosys<span>Medical Technology Solutions</span></div>
+    <span class="badge" id="badgeUsuario">…</span>
+    <div class="botones-nav">
+      <button class="boton-nav" onclick="window.location.href='/'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Regresar
+      </button>
+      <button class="boton-nav" onclick="window.location.href='/'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Home
+      </button>
+    </div>
+  </header>
+  <div class="fondo-logo" aria-hidden="true"></div>
+
+  <main class="page-wide">
+    <section class="card">
+      <h2>Catálogos del módulo Gestión</h2>
+      <p class="hint">
+        Lo que se escriba aquí son las opciones que aparecen en el diálogo <b>+ Nuevo</b> del
+        Calendario de actividades. Los elementos ya registrados conservan su título: los cambios se
+        aplican a lo que se cree después.
+      </p>
+      <p class="form-error" id="error" role="alert" hidden></p>
+      <p class="aviso-ok" id="avisoOk" role="status" hidden></p>
+    </section>
+
+    <div class="bloques">
+      <!-- Actividades -->
+      <section class="bloque">
+        <h3>Actividades</h3>
+        <p class="hint">Lista que se muestra al elegir Tipo = Actividad. Cada nombre se guarda como el título del elemento.</p>
+        <div class="filas" id="filasActividades"></div>
+        <div class="acciones">
+          <button type="button" class="btn-secondary" data-agrega="actividades">+ Agregar actividad</button>
+          <button type="button" class="btn-primary" data-guarda="actividades">Guardar actividades</button>
+        </div>
+      </section>
+
+      <!-- Subopciones -->
+      <section class="bloque">
+        <h3>Subopciones por actividad</h3>
+        <p class="hint">
+          Para actividades que necesitan una segunda lista. Ejemplo: <b>Capacitación</b> ofrece así el
+          aplicativo. La <b>etiqueta</b> es el nombre con que se ve esa lista en el formulario y es
+          <b>opcional</b>: en <b>+ Nuevo</b> la primera opción dice «(Sin …)», de modo que se puede dar de
+          alta sin elegir nada. Si borra o renombra una actividad en el bloque de arriba, se quedan sin
+          subopciones.
+        </p>
+        <div class="fila-selector">
+          <span class="lbl">Actividad</span>
+          <select id="subopsActividad"></select>
+        </div>
+        <div class="fila" style="max-width:420px">
+          <label style="flex:1 1 auto">Etiqueta de la lista
+            <input type="text" id="subopsEtiqueta" maxlength="80" placeholder="p. ej. Aplicativo">
+          </label>
+        </div>
+        <div class="filas" id="filasSubopciones"></div>
+        <div class="acciones">
+          <button type="button" class="btn-secondary" data-agrega="subopciones">+ Agregar opción</button>
+          <button type="button" class="btn-primary" data-guarda="subopciones">Guardar subopciones</button>
+        </div>
+      </section>
+
+      <!-- Tipos por aplicativo -->
+      <section class="bloque">
+        <h3>Tipos por aplicativo</h3>
+        <p class="hint">
+          El escalón siguiente a la cadena <b>actividad → aplicativo</b>: para cada aplicativo se escribe
+          su lista de <b>tipos</b>. Ejemplo: <b>Capacitación</b> ofrece el aplicativo <b>Aplicativos
+          Fuji</b> y ese aplicativo ofrece «Estación de trabajo», «Servidor», «Redes». En <b>+ Nuevo</b>
+          aparece el campo <b>Tipo de aplicativo</b> apenas se elige un aplicativo que tenga lista aquí, y
+          se oculta con los demás.
+        </p>
+        <p class="hint">
+          También es <b>opcional</b>: la primera opción del desplegable dice <b>«(Sin tipo de
+          aplicativo)»</b>, así que se puede dar de alta sin elegir ninguno. Lo elegido se guarda
+          <b>dentro del título</b> de la actividad —«Capacitación — Aplicativos Fuji — Estación de
+          trabajo — Anatomía Patológica»—, no en un campo nuevo: los elementos que ya están registrados no
+          se tocan. Si quita un aplicativo del bloque de <b>Subopciones por actividad</b> o lo renombra,
+          guarde ese bloque primero: sus tipos se borran solos y la lista de aquí deja de ofrecerlo.
+        </p>
+        <div class="fila-selector">
+          <span class="lbl">Aplicativo</span>
+          <select id="tiposSubopcion"></select>
+        </div>
+        <div class="filas" id="filasTipos"></div>
+        <div class="acciones">
+          <button type="button" class="btn-secondary" data-agrega="tipos">+ Agregar tipo</button>
+          <button type="button" class="btn-primary" data-guarda="tipos">Guardar tipos</button>
+        </div>
+      </section>
+
+      <!-- Regiones médicas -->
+      <section class="bloque">
+        <h3>Regiones médicas</h3>
+        <p class="hint">
+          Una región es un grupo de hospitales. La lista muestra <b>solo los nombres</b>: al elegir uno
+          —pulsando su renglón o el botón <b>Ver hospitales</b>— se despliega <b>debajo</b> la lista de
+          hospitales que le pertenecen (HES, HGR…), y las demás quedan plegadas. En el calendario el
+          desplegable <b>Región</b> aparece arriba del de <b>Hospital</b> y filtra sus opciones. Mientras
+          no guarde ninguna región, el campo Región no aparece y <b>+ Nuevo</b> se ve exactamente igual
+          que hasta ahora.
+        </p>
+        <p class="hint">
+          La región también <b>limita a quien la usa</b>: desde <a href="/admin/usuarios/index.html"
+          style="color:var(--azul);font-weight:600">Usuarios</a> se le asigna a cada persona una región y
+          esa persona solo ve, captura y exporta los hospitales de ella; <b>root</b> y quien tenga marcada
+          la opción <b>Ver todas las regiones</b> no tienen límite. Un hospital solo puede estar en
+          <b>una</b> región: si lo escribe en dos, la pantalla avisa cuáles son y hay que quitarlo de una
+          antes de guardar. <b>+ Agregar región</b> y <b>+ Agregar hospital</b> abren una <b>ventana
+          emergente</b>: en ella escribe el nombre y las filas que quiera —varias antes de aceptar— y,
+          hasta que pulsa el botón azul, no toca la lista; con <b>Cancelar</b> se queda todo como estaba.
+          En la ventana de la región, el nombre se puede <b>elegir de la lista</b> y al elegir una región
+          ya guardada <b>aparecen sus hospitales</b> en las filas, igual que en el panel de abajo. Aquí se
+          gestionan ahora los códigos: los que escriba y todavía no estén en la lista del sistema se
+          agregan al guardar, con la misma regla de siempre —hasta 10 caracteres, solo letras y números,
+          pasan a mayúsculas—. La región <b>no</b> se guarda dentro de la actividad —se deduce del
+          hospital—, así que mover un hospital de región reordena también lo que él ya tiene capturado,
+          sin tocar un solo registro. Lo que no escriba en ninguna región queda «Sin región». Todo lo que
+          guarde aquí queda en el servidor: se vuelve a ver igual aunque el equipo se apague o se
+          reinicie.
+        </p>
+        <div class="fichas" id="fichasRegiones"></div>
+        <!-- Sugerencias para las filas de hospital: los códigos ya guardados en el bloque
+             Hospitales. Son solo pistas mientras se teclea; se puede escribir uno nuevo. -->
+        <datalist id="sugerenciasHospital"></datalist>
+        <!-- Y las regiones ya guardadas, para elegir la región de la lista y que salgan sus hospitales. -->
+        <datalist id="sugerenciasRegion"></datalist>
+        <div class="acciones">
+          <button type="button" class="btn-secondary" data-agrega="region">+ Agregar región</button>
+          <button type="button" class="btn-primary" data-guarda="regiones">Guardar región y hospitales</button>
+        </div>
+      </section>
+
+      <!-- Servicios por hospital -->
+      <section class="bloque">
+        <h3>Servicios por hospital</h3>
+        <p class="hint">
+          Cada hospital tiene su propia lista de servicios (Anatomía Patológica, Radiología…).
+          En el calendario, el desplegable <b>Servicio</b> se llena con los del hospital elegido: si
+          ese hospital no tiene ninguno, el campo no aparece. El servicio elegido se agrega al título.
+        </p>
+        <p class="hint">
+          Mientras no se guarde nada, todos los hospitales muestran los servicios generales. Al guardar,
+          la lista general se actualiza con la suma de lo que escriba; dejar un hospital en blanco es lo
+          que le quita el campo Servicio a ese hospital.
+        </p>
+        <div class="fila-selector">
+          <span class="lbl">Hospital</span>
+          <select id="serviciosHospital"></select>
+        </div>
+        <div class="filas" id="filasServicios"></div>
+        <div class="acciones">
+          <button type="button" class="btn-secondary" data-agrega="servicios">+ Agregar servicio</button>
+          <button type="button" class="btn-primary" data-guarda="servicios">Guardar servicios</button>
+        </div>
+      </section>
+
+      <!-- El bloque «Hospitales» ya no está: los códigos se escriben dentro de su región y el
+           servidor los agrega a la lista del sistema al guardar (ver el aviso de arriba). -->
+    </div>
+  </main>
+
+  <script src="/js/gestion.js?v=20261123a"></script>
+  <script>
+  (function () {
+    'use strict';
+    var error = document.getElementById('error');
+    var avisoOk = document.getElementById('avisoOk');
+    // Las claves que se editan escribiendo listas simples. Los hospitales ya no tienen bloque propio:
+    // se escriben dentro de su región y el servidor los agrega a `gestion.hospitales` al guardar.
+    var CLAVES = { actividades: 'gestion.actividades', regiones: 'gestion.regiones' };
+    // Tope del servidor (GestionCatalogos.MaximoItems): el botón no agrega filas más allá de ahí.
+    var MAX_HOSPITALES = 40;
+    // Para que los avisos se lean en español y no con «hospital(es)».
+    function pluralH(n) { return n === 1 ? 'hospital' : 'hospitales'; }
+    var datos = {
+      actividades: [], subopciones: {}, tiposPorSubopcion: {}, serviciosPorHospital: {}, hospitales: [],
+      // Las regiones y su desglose tal como están guardados en el servidor: de aquí sale la lista que
+      // se ofrece al escribir el nombre, para que al elegir una región salgan sus hospitales.
+      // `seleccion` es la región cuya lista de hospitales está desplegada abajo de la lista.
+      regiones: [], desglose: {}, fichas: [], seleccion: 0
+    };
+    // Actividad / hospital cuyas filas están pintadas en este momento. Se guardan aparte de sus
+    // selectores porque al dispararse el change el selector ya trae el valor nuevo: sin estos
+    // valores, lo escrito para uno se atribuiría al siguiente.
+    var actividadVisible = '';
+    var hospitalVisible = '';
+    // Aplicativo cuyas filas de tipos están pintadas. Igual que los dos de arriba: al cambiar el
+    // selector ya trae el valor nuevo y lo escrito se atribuiría al aplicativo equivocado.
+    var aplicativoVisible = '';
+
+    function contenedor(catalogo) {
+      return document.getElementById('filas' + catalogo.charAt(0).toUpperCase() + catalogo.slice(1));
+    }
+
+    // Editor simple de listas: una fila por elemento, con su casilla de quitar.
+    function pintaLista(catalogo) {
+      var caja = contenedor(catalogo);
+      caja.innerHTML = '';
+      (datos[catalogo] || []).forEach(function (valor, i) {
+        var fila = document.createElement('div');
+        fila.className = 'fila';
+        var inp = document.createElement('input');
+        inp.type = 'text'; inp.value = valor; inp.maxLength = 80;
+        inp.dataset.c = catalogo; inp.dataset.i = i;
+        fila.appendChild(inp);
+        var q = document.createElement('button');
+        q.type = 'button'; q.className = 'btn-danger btn-quitar'; q.textContent = 'Quitar';
+        q.addEventListener('click', function () { datos[catalogo].splice(i, 1); pintaLista(catalogo); });
+        fila.appendChild(q);
+        caja.appendChild(fila);
+      });
+      if (!datos[catalogo].length) {
+        var v = document.createElement('p');
+        v.className = 'hint'; v.style.margin = '0';
+        v.textContent = 'La lista está vacía: agregue al menos un elemento.';
+        caja.appendChild(v);
+      }
+    }
+
+    function leeLista(catalogo) {
+      var sal = [];
+      contenedor(catalogo).querySelectorAll('input[type="text"]').forEach(function (inp) {
+        var t = String(inp.value || '').trim();
+        if (t.length && sal.map(function (x) { return x.toLowerCase(); }).indexOf(t.toLowerCase()) < 0) sal.push(t);
+      });
+      return sal;
+    }
+
+    // ---- subopciones: se edita una actividad a la vez ----
+    function pintaSelectorActividades() {
+      var sel = document.getElementById('subopsActividad');
+      sel.innerHTML = '';
+      datos.actividades.forEach(function (a) {
+        var op = document.createElement('option'); op.value = a; op.textContent = a; sel.appendChild(op);
+      });
+    }
+
+    function pintaSubopciones() {
+      actividadVisible = document.getElementById('subopsActividad').value;
+      var act = actividadVisible;
+      var caja = document.getElementById('filasSubopciones');
+      var s = datos.subopciones[act] || { etiqueta: '', opciones: [] };
+      document.getElementById('subopsEtiqueta').value = s.etiqueta;
+      caja.innerHTML = '';
+      s.opciones.forEach(function (valor, i) {
+        var fila = document.createElement('div');
+        fila.className = 'fila';
+        var inp = document.createElement('input');
+        inp.type = 'text'; inp.value = valor; inp.maxLength = 80;
+        inp.dataset.act = act; inp.dataset.i = i;
+        fila.appendChild(inp);
+        var q = document.createElement('button');
+        q.type = 'button'; q.className = 'btn-danger btn-quitar'; q.textContent = 'Quitar';
+        q.addEventListener('click', function () {
+          // Se conserva la entrada aunque quede sin opciones: la etiqueta escrita no debe borrarse.
+          datos.subopciones[act].opciones.splice(i, 1);
+          pintaSubopciones();
+        });
+        fila.appendChild(q);
+        caja.appendChild(fila);
+      });
+      if (!s.opciones.length) {
+        var nota = document.createElement('p');
+        nota.className = 'hint'; nota.style.margin = '0';
+        nota.textContent = 'Esta actividad no tiene subopciones: en el calendario solo se elige la actividad.';
+        caja.appendChild(nota);
+      }
+    }
+
+    function leeSubopciones() {
+      var act = actividadVisible;
+      if (!act) return;
+      var opciones = [];
+      document.getElementById('filasSubopciones').querySelectorAll('input[type="text"]').forEach(function (inp) {
+        var t = String(inp.value || '').trim();
+        if (t.length && opciones.map(function (x) { return x.toLowerCase(); }).indexOf(t.toLowerCase()) < 0) opciones.push(t);
+      });
+      var etiqueta = String(document.getElementById('subopsEtiqueta').value || '').trim();
+      // Se guarda también la entrada sin opciones: así la etiqueta escrita no se pierde al
+      // cambiar de actividad. Al guardar se envían solo las que tengan opciones.
+      datos.subopciones[act] = { etiqueta: etiqueta, opciones: opciones };
+    }
+
+    function subopcionesConOpciones() {
+      return Object.keys(datos.subopciones)
+        .map(function (act) { return { actividad: act, etiqueta: datos.subopciones[act].etiqueta, opciones: datos.subopciones[act].opciones }; })
+        .filter(function (s) { return s.opciones.length > 0; });
+    }
+
+    // Comparación de nombres sin distinguir mayúsculas: el servidor normaliza, la pantalla no.
+    function tieneActividad(lista, act) {
+      var a = String(act || '').toLowerCase();
+      return (lista || []).some(function (x) { return String(x).toLowerCase() === a; });
+    }
+
+    function tieneHospital(lista, h) {
+      var a = String(h || '').toLowerCase();
+      return (lista || []).some(function (x) { return String(x).toLowerCase() === a; });
+    }
+
+    function tieneRegion(lista, r) { return tieneHospital(lista, r); }
+
+    // ---- tipos por aplicativo: el tercer escalón, se edita un aplicativo a la vez ----
+    // La misma prueba de pertenencia de los dos de arriba: el servidor tampoco distingue mayúsculas.
+    function tieneAplicativo(lista, a) { return tieneHospital(lista, a); }
+
+    // El selector solo ofrece los aplicativos que de verdad están guardados como subopciones: el
+    // servidor rechaza una lista de tipos sobre un aplicativo que nadie registró, así que una opción
+    // que todavía es una fila sin guardar no puede tener tipos aún.
+    function aplicativosDisponibles() {
+      var sal = [];
+      subopcionesConOpciones().forEach(function (s) {
+        s.opciones.forEach(function (o) {
+          var t = String(o || '').trim();
+          if (!t) return;
+          if (!sal.some(function (x) { return x.toLowerCase() === String(t).toLowerCase(); })) sal.push(t);
+        });
+      });
+      return sal;
+    }
+
+    // El catálogo guardado puede traer el aplicativo con otra escritura que la de la lista de
+    // subopciones; se busca su clave real para leer y escribir siempre la misma.
+    function claveAplicativo(a) {
+      var min = String(a || '').toLowerCase();
+      return Object.keys(datos.tiposPorSubopcion).filter(function (k) {
+        return String(k).toLowerCase() === min;
+      })[0] || String(a || '');
+    }
+
+    // `conservar` se usa al repintar después de guardar subopciones, para no saltar al primero.
+    function pintaSelectorAplicativos(conservar) {
+      var sel = document.getElementById('tiposSubopcion');
+      var list = aplicativosDisponibles();
+      var elegido = String(conservar || aplicativoVisible || sel.value || '');
+      sel.innerHTML = '';
+      list.forEach(function (a) {
+        var op = document.createElement('option'); op.value = a; op.textContent = a; sel.appendChild(op);
+      });
+      if (tieneAplicativo(list, elegido)) sel.value = elegido;
+      aplicativoVisible = sel.value;
+    }
+
+    function pintaTipos() {
+      var sel = document.getElementById('tiposSubopcion');
+      aplicativoVisible = sel.value;
+      var a = aplicativoVisible;
+      var caja = document.getElementById('filasTipos');
+      caja.innerHTML = '';
+      if (!a) {
+        var aviso = document.createElement('p');
+        aviso.className = 'hint'; aviso.style.margin = '0';
+        aviso.textContent = 'Sin aplicativos todavía: escriba primero las opciones de su actividad en el bloque «Subopciones por actividad» y guárdelas.';
+        caja.appendChild(aviso);
+        return;
+      }
+      var lista = datos.tiposPorSubopcion[claveAplicativo(a)] || [];
+      lista.forEach(function (valor, i) {
+        var fila = document.createElement('div');
+        fila.className = 'fila';
+        var inp = document.createElement('input');
+        inp.type = 'text'; inp.value = valor; inp.maxLength = 80;
+        inp.dataset.a = a; inp.dataset.i = i;
+        fila.appendChild(inp);
+        var q = document.createElement('button');
+        q.type = 'button'; q.className = 'btn-danger btn-quitar'; q.textContent = 'Quitar';
+        q.addEventListener('click', function () {
+          datos.tiposPorSubopcion[claveAplicativo(a)].splice(i, 1);
+          pintaTipos();
+        });
+        fila.appendChild(q);
+        caja.appendChild(fila);
+      });
+      if (!lista.length) {
+        var nota = document.createElement('p');
+        nota.className = 'hint'; nota.style.margin = '0';
+        nota.textContent = 'Este aplicativo no tiene tipos: en + Nuevo del calendario no aparecerá el campo «Tipo de aplicativo» al elegirlo.';
+        caja.appendChild(nota);
+      }
+    }
+
+    function leeTipos() {
+      var a = aplicativoVisible;
+      if (!a) return;
+      var lista = [];
+      document.getElementById('filasTipos').querySelectorAll('input[type="text"]').forEach(function (inp) {
+        var t = String(inp.value || '').trim();
+        if (t.length && lista.map(function (x) { return x.toLowerCase(); }).indexOf(t.toLowerCase()) < 0) lista.push(t);
+      });
+      // Se guarda también el aplicativo vacío: así al cambiar de aplicativo no se pierde lo escrito y
+      // al enviar se pueden dejar fuera los que quedaron sin tipos.
+      datos.tiposPorSubopcion[claveAplicativo(a)] = lista;
+    }
+
+    // Solo se envían los aplicativos con al menos un tipo, y solo los que siguen en la lista de
+    // subopciones: el servidor reemplaza el catálogo entero y rechazaría un aplicativo huérfano.
+    function tiposParaEnviar() {
+      var validos = aplicativosDisponibles();
+      var sal = {};
+      Object.keys(datos.tiposPorSubopcion).forEach(function (a) {
+        var lista = datos.tiposPorSubopcion[a] || [];
+        if (lista.length && tieneAplicativo(validos, a)) sal[a] = lista;
+      });
+      return sal;
+    }
+
+
+    // ---- regiones médicas: la lista de regiones y, debajo, los hospitales de la seleccionada ----
+    // No hay casillas ni desplegable: se teclea el nombre de la región y sus hospitales se despliegan
+    // al elegirla. `datos.fichas` es lo leído de la pantalla y solo hace falta al repintar (después de
+    // guardar, o cuando cambia el bloque de Hospitales). Las filas se leen en un barrido por `data-n`
+    // —el número del renglón de la región— y `data-campo`, tal cual están escritas, blancos incluidos:
+    // así «Quitar» siempre quita la fila que se ve y no la de enfrente.
+    function leerFichas() {
+      var antes = datos.fichas || [];
+      var sal = [];
+      // Qué índice tiene filas de hospital en el DOM ahora mismo. Solo la región seleccionada las
+      // tiene: las demás están plegadas y hay que conservarlas de la lectura anterior, si no, al
+      // guardar se borrarían sus hospitales por el solo hecho de no estar a la vista.
+      var desplegada = {};
+      document.getElementById('fichasRegiones').querySelectorAll('input').forEach(function (inp) {
+        var i = Number(inp.dataset.n);
+        if (!sal[i]) sal[i] = { nombre: '', hospitales: [] };
+        var t = String(inp.value || '').trim();
+        if (inp.dataset.campo === 'nombre') sal[i].nombre = t;
+        else if (inp.dataset.campo === 'hospital') { sal[i].hospitales.push(t); desplegada[i] = true; }
+      });
+      // La marca de «esta región se armó eligiendo una guardada» se conserva mientras el nombre
+      // sea el mismo: es lo que hace que la nota del panel siga diciendo lo mismo al repintar.
+      sal.forEach(function (s, i) {
+        if (antes[i] && s.nombre.toLowerCase() === String(antes[i].nombre || '').toLowerCase()) {
+          s.cargada = antes[i].cargada;
+          if (!desplegada[i]) s.hospitales = (antes[i].hospitales || []).slice();
+        }
+      });
+      datos.fichas = sal;
+      return sal;
+    }
+
+    // Las pistas mientras se teclea: los códigos que ya están en la lista de Hospitales y las regiones
+    // guardadas. Son solo sugerencias del navegador —un código o un nombre nuevo se acepta igual y el
+    // servidor lo agrega a su lista—.
+    function pintaSugerencias() {
+      var dl = document.getElementById('sugerenciasHospital');
+      if (dl) {
+        dl.innerHTML = '';
+        datos.hospitales.forEach(function (h) {
+          var op = document.createElement('option'); op.value = h; op.textContent = h; dl.appendChild(op);
+        });
+      }
+      var dr = document.getElementById('sugerenciasRegion');
+      if (dr) {
+        dr.innerHTML = '';
+        datos.regiones.forEach(function (r) {
+          var op = document.createElement('option'); op.value = r; op.textContent = r; dr.appendChild(op);
+        });
+      }
+    }
+
+    // El servidor puede traer el nombre de la región con otra escritura; se busca sin distinguir
+    // mayúsculas, que es como lo compara él. Los códigos que ya no están en su lista se dejan fuera,
+    // para no intentar guardar una asignación que rechazaría.
+    function hospitalesDeRegionGuardada(r) {
+      var clave = Object.keys(datos.desglose)
+        .filter(function (x) { return String(x).toLowerCase() === String(r).toLowerCase(); })[0];
+      return (datos.desglose[clave] || [])
+        .filter(function (h) { return tieneHospital(datos.hospitales, h); })
+        .slice(0, MAX_HOSPITALES);
+    }
+
+    function pintaFichas() {
+      var caja = document.getElementById('fichasRegiones');
+      caja.innerHTML = '';
+      var fichas = datos.fichas || [];
+      if (!fichas.length) {
+        datos.seleccion = 0;
+        var v = document.createElement('p');
+        v.className = 'hint'; v.style.margin = '0';
+        v.textContent = 'Sin regiones guardadas: en + Nuevo del calendario no aparece el campo Región y los usuarios pueden ver todas. Use «+ Agregar región» para crear la primera.';
+        caja.appendChild(v);
+        pintaSugerencias();
+        return;
+      }
+      // La selección se mantiene por nombre al agregar o quitar filas; si la región ya no está, se va
+      // a la primera para que el panel de abajo nunca quede vacío.
+      if (!(datos.seleccion >= 0 && datos.seleccion < fichas.length)) datos.seleccion = 0;
+      var lista = document.createElement('div');
+      lista.className = 'region-lista';
+      fichas.forEach(function (f, i) { lista.appendChild(filaRegion(i, f)); });
+      caja.appendChild(lista);
+      caja.appendChild(panelHospitales(datos.seleccion, fichas[datos.seleccion]));
+      pintaSugerencias();
+    }
+
+    // Una renglón de la lista: el nombre de la región y cuántos hospitales lleva. Al pulsarlo (o al
+    // poner el cursor para editarlo) se despliega abajo su lista de hospitales; las demás quedan
+    // plegadas, así que la pantalla se lee de una sola mirada.
+    function filaRegion(i, f) {
+      var fila = document.createElement('div');
+      fila.className = 'region-fila' + (i === datos.seleccion ? ' activa' : '');
+
+      var nombre = document.createElement('input');
+      nombre.type = 'text'; nombre.maxLength = 80; nombre.value = f.nombre;
+      nombre.placeholder = 'Nombre de la región (p. ej. CMN La Raza)';
+      nombre.dataset.n = i; nombre.dataset.campo = 'nombre';
+      // Con `setAttribute`, no asignando la propiedad: en el navegador `list` de un <input> es de
+      // sola lectura, y asignarla lanza (el guion va en 'use strict') rompiendo la tarjeta a medias.
+      nombre.setAttribute('list', 'sugerenciasRegion');
+      nombre.addEventListener('focus', function () { selecciona(i); });
+      nombre.addEventListener('change', function () {
+        // Al elegir una región ya guardada —de la lista o escribiendo su nombre— se despliegan abajo
+        // sus hospitales, que son los que están en el servidor. Si el nombre no corresponde a ninguna,
+        // se queda lo escrito sin tocarlo.
+        var nuevo = String(nombre.value || '').trim();
+        if (nuevo.toLowerCase() === String(f.nombre || '').toLowerCase()) return;
+        if (!tieneRegion(datos.regiones, nuevo)) {
+          leerFichas();
+          if (datos.fichas[i]) datos.fichas[i].nombre = nuevo;
+          return;
+        }
+        leerFichas();
+        if (!datos.fichas[i]) datos.fichas[i] = { nombre: nuevo, hospitales: [] };
+        datos.fichas[i].nombre = nuevo;
+        datos.fichas[i].hospitales = hospitalesDeRegionGuardada(nuevo);
+        datos.fichas[i].cargada = nuevo;
+        datos.seleccion = i;
+        pintaFichas();
+        avisa('Se desplegaron los hospitales guardados de «' + nuevo + '». Use + Agregar hospital para escribir más.');
+      });
+      fila.appendChild(nombre);
+
+      var cuenta = document.createElement('span');
+      cuenta.className = 'region-cuenta';
+      var escritos = (f.hospitales || []).filter(function (h) { return String(h || '').trim().length; }).length;
+      cuenta.textContent = escritos ? escritos + ' ' + pluralH(escritos) : 'sin hospitales';
+      fila.appendChild(cuenta);
+
+      var ve = document.createElement('button');
+      ve.type = 'button'; ve.className = 'btn-secondary btn-mini';
+      ve.textContent = i === datos.seleccion ? 'Ocultar' : 'Ver hospitales';
+      ve.addEventListener('click', function () {
+        // «Ocultar» deja el panel cerrado: la lista se queda solo con los nombres.
+        datos.seleccion = i === datos.seleccion ? -1 : i;
+        pintaFichas();
+      });
+      fila.appendChild(ve);
+
+      var quita = document.createElement('button');
+      quita.type = 'button'; quita.className = 'btn-danger btn-quitar'; quita.textContent = 'Quitar';
+      quita.addEventListener('click', function () {
+        leerFichas();
+        datos.fichas.splice(i, 1);
+        if (datos.seleccion === i) datos.seleccion = 0;
+        else if (datos.seleccion > i) datos.seleccion--;
+        pintaFichas();
+      });
+      fila.appendChild(quita);
+      return fila;
+    }
+
+    function selecciona(i) {
+      if (datos.seleccion === i) return;
+      // Se lee antes de cambiar: lo escrito en la región desplegada es parte de lo que se va a conservar.
+      var nombre = '';
+      if (datos.fichas[i]) nombre = String(datos.fichas[i].nombre || '');
+      leerFichas();
+      datos.seleccion = i;
+      pintaFichas();
+      var inp = document.querySelector('#fichasRegiones input[data-n="' + i + '"][data-campo="nombre"]');
+      if (inp) inp.focus();
+      if (nombre && inp) inp.select();
+    }
+
+    // Panel de abajo: los hospitales de la región seleccionada. Es lo único que cambia al elegir otra.
+    function panelHospitales(i, f) {
+      var panel = document.createElement('div');
+      panel.className = 'region-panel';
+
+      var lbl = document.createElement('span');
+      lbl.className = 'lbl';
+      lbl.textContent = 'Hospitales de «' + (f.nombre || 'la región sin nombre') + '»';
+      panel.appendChild(lbl);
+
+      // Las filas a la vista, sin ninguna en blanco de cortesía: las escritas y nada más.
+      var filas = document.createElement('div');
+      filas.className = 'filas';
+      var escritos = 0;
+      (f.hospitales || []).forEach(function (h) {
+        if (String(h || '').trim().length) escritos++;
+        filas.appendChild(filaHospital(filas, i, h));
+      });
+      panel.appendChild(filas);
+      if (!escritos) {
+        var nota = document.createElement('p');
+        nota.className = 'hint'; nota.style.margin = '8px 0 0';
+        nota.textContent = f.cargada
+          ? 'Elegida «' + f.cargada + '»: no dejó hospitales guardados. Agregue filas con + Agregar hospital.'
+          : 'Sin hospitales todavía: use «+ Agregar hospital» para escribirlos. Los que no estén en ninguna región quedan «Sin región».';
+        panel.appendChild(nota);
+      }
+      var agrega = document.createElement('button');
+      agrega.type = 'button'; agrega.className = 'btn-secondary'; agrega.textContent = '+ Agregar hospital';
+      agrega.addEventListener('click', function () {
+        leerFichas();
+        if (!datos.fichas[i]) datos.fichas[i] = { nombre: '', hospitales: [] };
+        var escritos = datos.fichas[i].hospitales.filter(function (h) {
+          return String(h || '').trim().length;
+        }).length;
+        if (escritos >= MAX_HOSPITALES) {
+          Gestion.error(error, 'Una región no puede tener más de ' + MAX_HOSPITALES + ' hospitales.');
+          return;
+        }
+        // La fila no sale aquí: se escribe en la ventana, donde caben varias antes de aceptar.
+        ventanaHospitales(i);
+      });
+      panel.appendChild(agrega);
+      return panel;
+    }
+
+    // Una fila de hospital dentro de la tarjeta. Sale solo de dos maneras: elegiendo una región que ya
+    // tenía hospitales guardados, o con el botón «+ Agregar hospital». Nunca se agrega una fila vacía
+    // por escribir en la última: para eso está el botón.
+    function filaHospital(filas, i, valor) {
+      var fila = document.createElement('div');
+      fila.className = 'fila';
+      var inp = document.createElement('input');
+      inp.type = 'text'; inp.maxLength = 10; inp.value = valor || '';
+      inp.placeholder = 'p. ej. HES';
+      // Con `setAttribute`, no asignando la propiedad: en el navegador `list` de un <input> es de
+      // sola lectura, y asignarla lanza (el guion va en 'use strict') rompiendo la tarjeta a medias.
+      inp.setAttribute('list', 'sugerenciasHospital');
+      inp.dataset.n = i; inp.dataset.campo = 'hospital';
+      fila.appendChild(inp);
+      var q = document.createElement('button');
+      q.type = 'button'; q.className = 'btn-danger btn-quitar'; q.textContent = 'Quitar';
+      q.addEventListener('click', function () {
+        // La posición real de esta fila en este momento —no la que tenía al pintarse—, porque al
+        // quitar una las de abajo suben un número.
+        var j = Array.prototype.indexOf.call(filas.children, fila);
+        leerFichas();
+        if (datos.fichas[i] && j >= 0) datos.fichas[i].hospitales.splice(j, 1);
+        pintaFichas();
+      });
+      fila.appendChild(q);
+      return fila;
+    }
+
+    // ---- las dos ventanas emergentes de las regiones ----
+    // Lo que se escribe en la ventana es un borrador: hasta no pulsar el botón azul no toca las
+    // tarjetas, y Cancelar lo deja todo como estaba. Las clases son las del resto de la intranet
+    // (`dialog.modal`, `.modal-form`, `.modal-actions` en panel.css), así que se ve igual que el
+    // diálogo **+ Nuevo** del calendario. Se arma a mano y no con `G.formDialog` porque dentro no hay
+    // campos fijos sino filas que salen con su propio botón.
+    function ventana(cfg) {
+      var dlg = document.createElement('dialog');
+      dlg.className = 'modal';
+      var form = document.createElement('form');
+      form.className = 'modal-form';
+      var h = document.createElement('h3'); h.textContent = cfg.titulo; form.appendChild(h);
+      if (cfg.intro) {
+        var pi = document.createElement('p');
+        pi.className = 'hint'; pi.style.margin = '0'; pi.textContent = cfg.intro;
+        form.appendChild(pi);
+      }
+      var cuerpo = document.createElement('div');
+      form.appendChild(cuerpo);
+      var err = document.createElement('p');
+      err.className = 'form-error'; err.setAttribute('role', 'alert'); err.hidden = true;
+      form.appendChild(err);
+      var acc = document.createElement('div'); acc.className = 'modal-actions';
+      var bc = document.createElement('button');
+      bc.type = 'button'; bc.className = 'btn-secondary'; bc.textContent = 'Cancelar';
+      bc.addEventListener('click', function () { dlg.close(); quita(); });
+      acc.appendChild(bc);
+      var bs = document.createElement('button');
+      bs.type = 'submit'; bs.className = 'btn-primary'; bs.textContent = cfg.textoSubmit || 'Aceptar';
+      acc.appendChild(bs);
+      form.appendChild(acc);
+      dlg.appendChild(form);
+      document.body.appendChild(dlg);
+      // La ventana se quita del documento al cerrarse. Se hace también a mano —y no solo con el evento
+      // `close`— porque ese evento lo manda el navegador al actualizar la pantalla: con la pestaña de
+      // fondo (o en un navegador sin ventana) puede no llegar nunca, y la ventana cancelada dejaría un
+      // nodo colgado que estorba a la siguiente. Quitarla dos veces no hace nada.
+      var quita = function () { if (dlg.parentNode) dlg.remove(); };
+      var api = { cuerpo: cuerpo, avisar: function (msg) { Gestion.error(err, msg); } };
+      if (cfg.construir) cfg.construir(api);
+      form.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        Gestion.sinError(err);
+        // Si el aceptador se queja, la ventana se queda abierta con el aviso dentro: nada de lo
+        // escrito se pierde y se puede corregir sin volver a empezar.
+        try { cfg.aceptar(api); } catch (e) { Gestion.error(err, e.message || String(e)); return; }
+        dlg.close();
+        quita();
+      });
+      dlg.addEventListener('close', quita);
+      dlg.showModal();
+      return api;
+    }
+
+    // Una fila de hospital dentro de la ventana. No lleva `data-n`: lo escrito aquí todavía no es
+    // tarjeta, es el borrador que se acepta o se cancela.
+    function filaBorrador(caja, valor) {
+      var fila = document.createElement('div');
+      fila.className = 'fila';
+      var inp = document.createElement('input');
+      inp.type = 'text'; inp.maxLength = 10; inp.value = valor || '';
+      inp.placeholder = 'p. ej. HES';
+      // Misma razón que en la tarjeta: `list` es de sola lectura, se pone con setAttribute.
+      inp.setAttribute('list', 'sugerenciasHospital');
+      fila.appendChild(inp);
+      var q = document.createElement('button');
+      q.type = 'button'; q.className = 'btn-danger btn-quitar'; q.textContent = 'Quitar';
+      q.addEventListener('click', function () { fila.remove(); });
+      fila.appendChild(q);
+      caja.appendChild(fila);
+      return inp;
+    }
+
+    // Lo escrito en las filas de la ventana, ya normalizado: en mayúsculas, sin blancos y sin
+    // repetidos dentro de la propia ventana.
+    function leerBorrador(caja) {
+      var sal = [];
+      caja.querySelectorAll('input').forEach(function (inp) {
+        var may = String(inp.value || '').trim().toUpperCase();
+        if (may && sal.indexOf(may) < 0) sal.push(may);
+      });
+      return sal;
+    }
+
+    // El botón de la ventana: una fila más, sin pasar del tope del servidor.
+    function botonFilas(api, filas, maxFilas, texto) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'btn-secondary'; b.textContent = texto || '+ Agregar otro hospital';
+      b.addEventListener('click', function () {
+        if (filas.children.length >= maxFilas) {
+          api.avisar('No pueden escribirse más de ' + maxFilas + ' hospitales en esta ventana.');
+          return;
+        }
+        filaBorrador(filas, '').focus();
+      });
+      return b;
+    }
+
+    // Región nueva: nombre arriba (con la lista de las guardadas, para que al elegir una salgan sus
+    // hospitales también dentro de la ventana) y las filas debajo.
+    function ventanaRegion() {
+      var filas = document.createElement('div');
+      filas.className = 'filas';
+      var nota = document.createElement('p');
+      nota.className = 'hint'; nota.style.margin = '0';
+      var nombre = document.createElement('input');
+      ventana({
+        titulo: 'Nueva región médica',
+        intro: 'Elija una región ya guardada de la lista para traer sus hospitales, o escriba un nombre ' +
+               'nuevo. Las filas se llenan con «+ Agregar otro hospital» y entran todas a la vez al aceptar.',
+        textoSubmit: 'Agregar región',
+        construir: function (api) {
+          var lab = document.createElement('label');
+          lab.textContent = 'Nombre de la región (obligatorio) ';
+          nombre.type = 'text'; nombre.maxLength = 80;
+          nombre.placeholder = 'p. ej. CMN La Raza';
+          nombre.setAttribute('list', 'sugerenciasRegion');
+          lab.appendChild(nombre);
+          api.cuerpo.appendChild(lab);
+          var lbl = document.createElement('span');
+          lbl.className = 'lbl'; lbl.textContent = 'Hospitales de esta región';
+          api.cuerpo.appendChild(lbl);
+          api.cuerpo.appendChild(filas);
+          api.cuerpo.appendChild(nota);
+          api.cuerpo.appendChild(botonFilas(api, filas, MAX_HOSPITALES));
+          nota.textContent = 'Una fila lista para el primer código; «+ Agregar otro hospital» saca las demás.';
+          filaBorrador(filas, '').focus();
+          nombre.addEventListener('change', function () {
+            var r = String(nombre.value || '').trim();
+            if (!tieneRegion(datos.regiones, r)) {
+              nota.textContent = 'Región nueva: sus hospitales se escriben abajo.';
+              return;
+            }
+            var hs = hospitalesDeRegionGuardada(r);
+            filas.innerHTML = '';
+            hs.forEach(function (h) { filaBorrador(filas, h); });
+            nota.textContent = hs.length
+              ? (hs.length === 1
+                ? 'Se trajo 1 hospital guardado de «' + r + '»; puede agregar más o quitarlo si no va aquí.'
+                : 'Se trajeron los ' + hs.length + ' hospitales guardados de «' + r +
+                  '»; puede agregar más o quitar los que haga falta.')
+              : '«' + r + '» no dejó hospitales guardados: agregue las filas abajo.';
+          });
+          api.nombre = nombre;
+          api.filas = filas;
+        },
+        aceptar: function (api) {
+          var texto = String(api.nombre.value || '').trim();
+          if (!texto) throw new Error('Escriba el nombre de la región.');
+          var hs = leerBorrador(api.filas);
+          if (hs.length > MAX_HOSPITALES) {
+            throw new Error('Una región no puede tener más de ' + MAX_HOSPITALES + ' hospitales.');
+          }
+          leerFichas();
+          var dueño = {};
+          datos.fichas.forEach(function (f) {
+            if (!f) return;
+            f.hospitales.forEach(function (h) {
+              var may = String(h || '').trim().toUpperCase();
+              if (may) dueño[may] = f.nombre || '(región sin nombre)';
+            });
+          });
+          for (var k = 0; k < hs.length; k++) {
+            if (dueño[hs[k]]) {
+              throw new Error('El hospital «' + hs[k] + '» ya está escrito en «' + dueño[hs[k]] +
+                '»: un hospital solo puede estar en una región.');
+            }
+          }
+          var repetida = datos.fichas.filter(function (f) {
+            return f && String(f.nombre).toLowerCase() === texto.toLowerCase();
+          })[0];
+          if (repetida) {
+            throw new Error('La región «' + texto + '» ya está en la pantalla: edítela o quítela antes de agregarla otra vez.');
+          }
+          datos.fichas.push({ nombre: texto, hospitales: hs });
+          // La región recién agregada es la que se despliega: es la que se quiere revisar.
+          datos.seleccion = datos.fichas.length - 1;
+          pintaFichas();
+          avisa('Región «' + texto + '» agregada con ' + hs.length +
+            ' ' + pluralH(hs.length) + ' abajo. Pulse Guardar región y hospitales para dejarlos en el servidor.');
+        }
+      });
+    }
+
+    // Hospitales de una región que ya está en la lista: varias filas en la ventana y una sola
+    // aceptación, que es lo que pidió.
+    function ventanaHospitales(i) {
+      leerFichas();
+      var f = datos.fichas[i] || { nombre: '', hospitales: [] };
+      var escritos = f.hospitales.filter(function (h) { return String(h || '').trim().length; }).length;
+      var quedan = MAX_HOSPITALES - escritos;
+      var filas = document.createElement('div');
+      filas.className = 'filas';
+      var nota = document.createElement('p');
+      nota.className = 'hint'; nota.style.margin = '0';
+      ventana({
+        titulo: f.nombre ? 'Agregar hospitales a «' + f.nombre + '»' : 'Agregar hospitales a la región sin nombre',
+        intro: 'Escriba los códigos (HES, HGR…). Puede llenar varias filas y aceptarlas todas juntas: ' +
+               'al aceptar se agregan a la lista de hospitales que se ve debajo de «' + (f.nombre || 'la región sin nombre') + '».',
+        textoSubmit: 'Agregar a la región',
+        construir: function (api) {
+          api.cuerpo.appendChild(filas);
+          nota.textContent = 'Esta región lleva ' + escritos + ' ' + pluralH(escritos) + '; caben hasta ' +
+            MAX_HOSPITALES + ' (quedan ' + Math.max(quedan, 0) + ').';
+          api.cuerpo.appendChild(nota);
+          api.cuerpo.appendChild(botonFilas(api, filas, Math.max(quedan, 0)));
+          filaBorrador(filas, '').focus();
+          api.filas = filas;
+        },
+        aceptar: function (api) {
+          var nuevos = leerBorrador(api.filas);
+          if (!nuevos.length) throw new Error('No escribió ningún hospital: escriba al menos un código o cancele.');
+          leerFichas();
+          var destino = datos.fichas[i];
+          if (!destino) { destino = { nombre: '', hospitales: [] }; datos.fichas[i] = destino; }
+          var ya = {};
+          destino.hospitales.forEach(function (h) {
+            var may = String(h || '').trim().toUpperCase();
+            if (may) ya[may] = true;
+          });
+          // Y en las demás tarjetas: un hospital solo puede estar en una región, así que la ventana lo
+          // dice antes de aceptar en lugar de dejarlo para el botón de guardar.
+          var dueño = {};
+          datos.fichas.forEach(function (f, k) {
+            if (!f || k === i) return;
+            f.hospitales.forEach(function (h) {
+              var may = String(h || '').trim().toUpperCase();
+              if (may) dueño[may] = f.nombre || '(región sin nombre)';
+            });
+          });
+          for (var m = 0; m < nuevos.length; m++) {
+            if (dueño[nuevos[m]]) {
+              throw new Error('El hospital «' + nuevos[m] + '» ya está escrito en «' + dueño[nuevos[m]] +
+                '»: un hospital solo puede estar en una región.');
+            }
+          }
+          for (var k = 0; k < nuevos.length; k++) {
+            if (ya[nuevos[k]]) {
+              throw new Error('El hospital «' + nuevos[k] + '» ya está escrito en «' +
+                (destino.nombre || '(región sin nombre)') + '».');
+            }
+          }
+          if (escritos + nuevos.length > MAX_HOSPITALES) {
+            throw new Error('Caben hasta ' + MAX_HOSPITALES + ' hospitales por región: ahora mismo lleva ' +
+              escritos + ' y quiere agregar ' + nuevos.length + '.');
+          }
+          nuevos.forEach(function (h) { destino.hospitales.push(h); });
+          pintaFichas();
+          avisa((nuevos.length === 1 ? 'Se agregó 1 hospital' : 'Se agregaron ' + nuevos.length + ' hospitales') +
+            ' a «' + (destino.nombre || 'la región sin nombre') +
+            '». Pulse Guardar región y hospitales para dejarlos en el servidor.');
+        }
+      });
+    }
+
+    // Lo escrito en las tarjetas, listo para enviar, con los tres avisos que el servidor también daría
+    // pero que aquí se pueden decir mirando la pantalla: una región con hospitales y sin nombre, la
+    // misma región escrita dos veces, o un hospital en dos regiones (solo puede estar en una).
+    function regionesParaGuardar() {
+      var fichas = leerFichas();
+      var nombres = [], porRegion = {}, dueno = {};
+      for (var i = 0; i < fichas.length; i++) {
+        if (!fichas[i]) continue;
+        var nombre = fichas[i].nombre;
+        var hs = [];
+        fichas[i].hospitales.forEach(function (h) {
+          var may = h.toUpperCase();
+          if (!may.length || hs.indexOf(may) >= 0) return;      // fila en blanco o repetida: no cuenta
+          hs.push(may);
+        });
+        if (!nombre) {
+          if (hs.length) return { error: 'La región ' + (i + 1) + ' tiene hospitales pero no nombre: escríbalo o quite el renglón.' };
+          continue;                                            // región recién agregada y vacía: no se guarda
+        }
+        if (tieneRegion(nombres, nombre)) return { error: 'La región «' + nombre + '» está escrita dos veces: borre una de las dos.' };
+        nombres.push(nombre);
+        for (var j = 0; j < hs.length; j++) {
+          if (dueno[hs[j]]) return { error: 'El hospital «' + hs[j] + '» está en «' + dueno[hs[j]] + '» y en «' + nombre + '»: un hospital solo puede estar en una región.' };
+          dueno[hs[j]] = nombre;
+        }
+        porRegion[nombre] = hs;
+      }
+      return { nombres: nombres, porRegion: porRegion };
+    }
+
+    // Un solo botón para las dos cosas. Primero se guarda la lista de nombres —el servidor recorta con
+    // ella el desglose viejo— y después el desglose, que además mete en la lista de Hospitales los
+    // códigos nuevos. Con la lista de regiones vacía no se manda el desglose: el recorte ya borró todo
+    // y el servidor rechaza un envío sin regiones. Se envían TODAS las regiones, también las que
+    // quedaron sin hospitales, porque el guardado reemplaza el catálogo entero.
+    function guardaRegiones(boton) {
+      var r = regionesParaGuardar();
+      if (r.error) { Gestion.error(error, r.error); return; }
+      var nuevos = [];
+      r.nombres.forEach(function (n) {
+        r.porRegion[n].forEach(function (h) {
+          if (!tieneHospital(datos.hospitales, h) && nuevos.indexOf(h) < 0) nuevos.push(h);
+        });
+      });
+      boton.disabled = true;
+      var lista = { clave: CLAVES.regiones, valores: r.nombres };
+      Gestion.api('/api/programador/lista', { method: 'PUT', body: JSON.stringify(lista) })
+        .then(function () {
+          if (!r.nombres.length) return;
+          var porRegion = {};
+          r.nombres.forEach(function (n) { porRegion[n] = r.porRegion[n]; });
+          return Gestion.api('/api/programador/regiones', { method: 'PUT', body: JSON.stringify({ porRegion: porRegion }) });
+        })
+        .then(function () {
+          // El servidor normaliza y agrega: la pantalla copia lo que guardó, para que las sugerencias
+          // y el desplegable de servicios muestren exactamente lo mismo que quedó escrito. Lo mismo con
+          // las regiones y su desglose: es lo que ofrece la lista del campo nombre y lo que se despliega
+          // al elegir una región.
+          datos.hospitales = datos.hospitales.concat(nuevos);
+          datos.regiones = r.nombres.slice();
+          var guardado = {};
+          r.nombres.forEach(function (n) { guardado[n] = r.porRegion[n].slice(); });
+          datos.desglose = guardado;
+          // El nombre que estaba desplegado antes de guardar, para seguir viéndolo después (hay que
+          // tomarlo antes de rearmar las fichas, que son otras).
+          var visible = String(((datos.fichas || [])[datos.seleccion] || {}).nombre || '');
+          datos.fichas = r.nombres.map(function (n) { return { nombre: n, hospitales: r.porRegion[n] }; });
+          // Se sigue viendo la misma región, aunque el servidor la haya reordenado o escrito con otras
+          // mayúsculas; si ya no está (se quitó), se regresa a la primera.
+          var vuelve = 0;
+          r.nombres.forEach(function (n, k) {
+            if (visible && String(n).toLowerCase() === visible.toLowerCase()) vuelve = k;
+          });
+          datos.seleccion = vuelve;
+          leeServicios();
+          pintaSelectorHospitales();
+          pintaServicios();
+          pintaFichas();
+          avisa(nuevos.length
+            ? 'Regiones guardadas. Se agregaron a la lista de hospitales del sistema: ' + nuevos.join(', ') + '.'
+            : 'Regiones y hospitales guardados. En el calendario se nota al abrir + Nuevo de nuevo.');
+        })
+        .catch(function (e) { Gestion.error(error, e.message); })
+        .finally(function () { boton.disabled = false; });
+    }
+
+    document.getElementById('subopsActividad').addEventListener('change', function () {
+      leeSubopciones();      // guarda lo escrito en la actividad que estaba visible
+      pintaSubopciones();    // y pinta las filas de la recién elegida
+    });
+    document.getElementById('subopsEtiqueta').addEventListener('input', function () {
+      var act = actividadVisible;
+      if (!act) return;
+      if (!datos.subopciones[act]) datos.subopciones[act] = { etiqueta: '', opciones: [] };
+      datos.subopciones[act].etiqueta = this.value.trim();
+    });
+
+    document.getElementById('tiposSubopcion').addEventListener('change', function () {
+      leeTipos();        // guarda lo escrito en el aplicativo que estaba visible
+      pintaTipos();      // y pinta las filas del recién elegido
+    });
+
+    // ---- servicios por hospital: se edita un hospital a la vez ----
+    // `conservar` se usa al repintar después de guardar regiones, para no saltar al primero.
+    function pintaSelectorHospitales(conservar) {
+      var sel = document.getElementById('serviciosHospital');
+      var elegido = String(conservar || hospitalVisible || sel.value || '').toUpperCase();
+      sel.innerHTML = '';
+      datos.hospitales.forEach(function (h) {
+        var op = document.createElement('option'); op.value = h; op.textContent = h; sel.appendChild(op);
+      });
+      if (tieneHospital(datos.hospitales, elegido)) sel.value = elegido;
+    }
+
+    function pintaServicios() {
+      var sel = document.getElementById('serviciosHospital');
+      hospitalVisible = sel.value;
+      var h = hospitalVisible;
+      var caja = document.getElementById('filasServicios');
+      caja.innerHTML = '';
+      if (!h) {
+        var aviso = document.createElement('p');
+        aviso.className = 'hint'; aviso.style.margin = '0';
+        aviso.textContent = 'Sin hospitales todavía: escríbalos dentro de su región y aparecerán aquí.';
+        caja.appendChild(aviso);
+        return;
+      }
+      var lista = datos.serviciosPorHospital[h] || [];
+      lista.forEach(function (valor, i) {
+        var fila = document.createElement('div');
+        fila.className = 'fila';
+        var inp = document.createElement('input');
+        inp.type = 'text'; inp.value = valor; inp.maxLength = 80;
+        inp.dataset.h = h; inp.dataset.i = i;
+        fila.appendChild(inp);
+        var q = document.createElement('button');
+        q.type = 'button'; q.className = 'btn-danger btn-quitar'; q.textContent = 'Quitar';
+        q.addEventListener('click', function () {
+          datos.serviciosPorHospital[h].splice(i, 1);
+          pintaServicios();
+        });
+        fila.appendChild(q);
+        caja.appendChild(fila);
+      });
+      if (!lista.length) {
+        var nota = document.createElement('p');
+        nota.className = 'hint'; nota.style.margin = '0';
+        nota.textContent = 'Este hospital no tiene servicios: en + Nuevo no aparecerá el campo Servicio al elegirlo.';
+        caja.appendChild(nota);
+      }
+    }
+
+    function leeServicios() {
+      var h = hospitalVisible;
+      if (!h) return;
+      var lista = [];
+      document.getElementById('filasServicios').querySelectorAll('input[type="text"]').forEach(function (inp) {
+        var t = String(inp.value || '').trim();
+        if (t.length && lista.map(function (x) { return x.toLowerCase(); }).indexOf(t.toLowerCase()) < 0) lista.push(t);
+      });
+      // Se guarda también el hospital vacío: así al cambiar de hospital no se pierde lo escrito y
+      // al enviar se pueden dejar fuera los que quedaron sin servicios.
+      datos.serviciosPorHospital[h] = lista;
+    }
+
+    // Solo se envían los hospitales con al menos un servicio; el servidor deja fuera los vacíos.
+    function serviciosParaEnviar() {
+      var sal = {};
+      Object.keys(datos.serviciosPorHospital).forEach(function (h) {
+        var lista = datos.serviciosPorHospital[h] || [];
+        if (lista.length) sal[h] = lista;
+      });
+      return sal;
+    }
+
+    document.getElementById('serviciosHospital').addEventListener('change', function () {
+      leeServicios();
+      pintaServicios();
+    });
+
+    document.querySelectorAll('[data-agrega]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var c = b.dataset.agrega;
+        if (c === 'subopciones') {
+          var act = actividadVisible;
+          if (!act) { Gestion.error(error, 'Elija primero la actividad.'); return; }
+          leeSubopciones();
+          if (!datos.subopciones[act]) datos.subopciones[act] = { etiqueta: 'Opción', opciones: [] };
+          datos.subopciones[act].opciones.push('');
+          pintaSubopciones();
+          ultimaFila(contenedor('subopciones'));
+          return;
+        }
+        if (c === 'tipos') {
+          var aplicativo = aplicativoVisible;
+          if (!aplicativo) { Gestion.error(error, 'Elija primero el aplicativo.'); return; }
+          leeTipos();
+          var clave = claveAplicativo(aplicativo);
+          if (!datos.tiposPorSubopcion[clave]) datos.tiposPorSubopcion[clave] = [];
+          datos.tiposPorSubopcion[clave].push('');
+          pintaTipos();
+          ultimaFila(contenedor('tipos'));
+          return;
+        }
+        if (c === 'servicios') {
+          var h = hospitalVisible;
+          if (!h) { Gestion.error(error, 'Elija primero el hospital.'); return; }
+          leeServicios();
+          datos.serviciosPorHospital[h] = datos.serviciosPorHospital[h] || [];
+          datos.serviciosPorHospital[h].push('');
+          pintaServicios();
+          ultimaFila(contenedor('servicios'));
+          return;
+        }
+        if (c === 'region') {
+          // La región se agrega en su ventana: nombre arriba y las filas que quiera debajo. La
+          // tarjeta solo aparece cuando se acepta; Cancelar no deja nada en la pantalla.
+          ventanaRegion();
+          return;
+        }
+        datos[c].push('');
+        pintaLista(c);
+        ultimaFila(contenedor(c));
+      });
+    });
+
+    // Lleva el cursor a la fila recién agregada para escribirla de una vez.
+    function ultimaFila(caja) {
+      var inps = caja.querySelectorAll('input[type="text"]');
+      if (inps.length) { var u = inps[inps.length - 1]; u.focus(); u.select(); }
+    }
+
+    function avisa(msg) { avisoOk.textContent = msg; avisoOk.hidden = false; }
+
+    document.querySelectorAll('[data-guarda]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        Gestion.sinError(error); avisoOk.hidden = true;
+        var c = b.dataset.guarda;
+        // Las regiones se guardan por su cuenta: son dos llamadas seguidas (la lista de nombres y su
+        // desglose) y el botón va de las dos cosas a la vez.
+        if (c === 'regiones') { guardaRegiones(b); return; }
+        var ruta = '/api/programador/lista', cuerpo;
+        if (c === 'subopciones') {
+          leeSubopciones();
+          ruta = '/api/programador/subopciones';
+          cuerpo = { subopciones: subopcionesConOpciones() };
+          if (!cuerpo.subopciones.length) { Gestion.error(error, 'Escriba al menos una opción.'); return; }
+        } else if (c === 'tipos') {
+          leeTipos();
+          ruta = '/api/programador/tipos';
+          cuerpo = { porSubopcion: tiposParaEnviar() };
+          if (!Object.keys(cuerpo.porSubopcion).length) {
+            // Con todas las listas vacías el servidor se queda sin catálogo y el campo «Tipo de
+            // aplicativo» desaparecería de + Nuevo: se avisa en vez de guardar algo que la pantalla
+            // no va a reflejar (mismo criterio que los servicios por hospital).
+            Gestion.error(error, 'Deje al menos un tipo en algún aplicativo.');
+            return;
+          }
+        } else if (c === 'servicios') {
+          leeServicios();
+          ruta = '/api/programador/servicios';
+          cuerpo = { porHospital: serviciosParaEnviar() };
+          if (!Object.keys(cuerpo.porHospital).length) {
+            // Con todas las listas vacías el servidor no tiene un catálogo propio y los
+            // formularios volverían a mostrar los servicios generales de siempre: se avisa en vez
+            // de guardar algo que la pantalla no va a reflejar.
+            Gestion.error(error, 'Deje al menos un servicio en algún hospital.');
+            return;
+          }
+        } else {
+          datos[c] = leeLista(c);
+          // Las actividades no admiten lista vacía; las regiones se guardan arriba, y ellas sí pueden
+          // quedar en blanco (sin regiones el calendario deja de mostrar el campo Región).
+          if (!datos[c].length) { Gestion.error(error, 'La lista no puede quedar vacía.'); return; }
+          cuerpo = { clave: CLAVES[c], valores: datos[c] };
+        }
+        b.disabled = true;
+        Gestion.api(ruta, { method: 'PUT', body: JSON.stringify(cuerpo) }).then(function () {
+          avisa('Catálogo guardado. En el calendario se nota al abrir + Nuevo de nuevo.');
+          if (c === 'actividades') {
+            // Una actividad borrada o renombrada se queda sin sus subopciones: se quitan de la
+            // pantalla para no intentar guardar una que ya no existe.
+            Object.keys(datos.subopciones).forEach(function (act) {
+              if (!tieneActividad(datos.actividades, act)) delete datos.subopciones[act];
+            });
+            pintaSelectorActividades();
+            pintaSubopciones();
+          }
+          if (c === 'subopciones') {
+            // El servidor recortó los tipos de los aplicativos que ya no están; la pantalla hace lo
+            // mismo para no ofrecer ni enviar una lista que él rechazaría, y el selector se refresca
+            // con los aplicativos recién escritos.
+            var validos = aplicativosDisponibles();
+            Object.keys(datos.tiposPorSubopcion).forEach(function (a) {
+              if (!tieneAplicativo(validos, a)) delete datos.tiposPorSubopcion[a];
+            });
+            pintaSelectorAplicativos();
+            pintaTipos();
+          }
+          // El bloque de Hospitales ya no se edita aquí: los códigos nuevos entran al guardar su región,
+          // y ese repintado lo hace `guardaRegiones`. Quitarlos del catálogo del sistema se sigue haciendo
+          // en el servidor (RecortarDesglose), no desde esta pantalla.
+        }).catch(function (e) { Gestion.error(error, e.message); })
+          .finally(function () { b.disabled = false; });
+      });
+    });
+
+    Gestion.init().then(function () {
+      document.getElementById('badgeUsuario').textContent =
+        Gestion.YO + ' · ' + Gestion.nombreRol(Gestion.ROL);
+      if (!Gestion.tiene('programador.administrar')) {
+        Gestion.error(error, 'Tu rol no puede editar los catálogos. Pídelo al Administrador (permiso «Programador»).');
+        document.querySelectorAll('button, input, select').forEach(function (x) { x.disabled = true; });
+        return Promise.resolve();
+      }
+      return Gestion.api('/api/programador/catalogos').then(function (d) {
+        datos = {
+          actividades: d.actividades || [],
+          subopciones: d.subopciones || {},
+          // Los tipos escritos para cada aplicativo (el tercer escalón). Un servidor que aún no los
+          // guarda manda el campo ausente y la pantalla trabaja con un objeto vacío: los aplicativos
+          // salen sin tipos y el calendario no muestra el campo, exactamente igual que antes.
+          tiposPorSubopcion: d.subopcionesTipos || {},
+          serviciosPorHospital: d.serviciosPorHospital || {},
+          hospitales: d.hospitales || [],
+          // La lista de regiones y su desglose tal como quedaron guardados: de aquí salen las
+          // sugerencias del campo nombre y los hospitales que se despliegan al elegir una región.
+          regiones: d.regiones || [],
+          desglose: d.hospitalesPorRegion || {},
+          fichas: [],
+          seleccion: 0
+        };
+        // Un renglón por región guardada —solo el nombre— y, debajo de la seleccionada, sus hospitales.
+        // Se arma después de asignar `datos`, porque `hospitalesDeRegionGuardada` lee de
+        // ahí; si se calcula dentro del propio objeto todavía estaría vacíos y los renglones saldrían
+        // sin hospitales. Los códigos que ya no están en la lista del sistema no se pintan, para no
+        // intentar guardar una asignación que el servidor rechazaría.
+        datos.fichas = datos.regiones.map(function (r) {
+          return { nombre: r, hospitales: hospitalesDeRegionGuardada(r) };
+        });
+        // Subopciones huérfanas (de una actividad que ya no está en la lista) no se muestran.
+        Object.keys(datos.subopciones).forEach(function (act) {
+          if (!tieneActividad(datos.actividades, act)) delete datos.subopciones[act];
+        });
+        pintaLista('actividades');
+        pintaSelectorActividades();
+        pintaSubopciones();
+        // El selector de aplicativos va después de las subopciones: se arma con lo que ellas dejan
+        // guardado, así que un aplicativo huérfano (renombrado o borrado) no llega a aparecer aquí.
+        Object.keys(datos.tiposPorSubopcion).forEach(function (a) {
+          if (!tieneAplicativo(aplicativosDisponibles(), a)) delete datos.tiposPorSubopcion[a];
+        });
+        pintaSelectorAplicativos();
+        pintaTipos();
+        pintaSelectorHospitales();
+        pintaServicios();
+        pintaFichas();
+      }).catch(function (e) { Gestion.error(error, 'No se pudieron cargar los catálogos: ' + e.message); });
+    }).catch(function (e) { Gestion.error(error, e.message); });
+  })();
+  </script>
+<script src="/js/ubicacion.js"></script>
+</body>
+</html>

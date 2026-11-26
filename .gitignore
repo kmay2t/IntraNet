@@ -1,0 +1,56 @@
+# .NET
+bin/
+obj/
+publish/
+*.user
+*.suo
+*.cache
+*.log
+
+# Secrets and sensitive data
+.env
+*.pem
+*.key
+*.cert
+*.p12
+*.pfx
+App_Data/
+*.bin
+
+# Database and storage
+dicom_downloads/
+*.db
+*.sqlite
+
+# IDEs
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Logs
+logs/
+*.log
+
+# Python
+__pycache__/
+venv/
+.venv/
+*.pyc
+
+# Node modules (if any)
+node_modules/
+
+# Verification directories
+.verify/

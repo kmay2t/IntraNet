@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <script src="/js/theme.js?v=20261119e"></script>
+  <script src="/js/filtro.js?v=20261029a"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reportes · Reportes de estatus — Intranet meditechnosys</title>
+  <link rel="stylesheet" href="/css/panel.css?v=20261123a" />
+  <script src="/js/reportes-tabs.js?v=20261104d" defer></script>
+  <style>
+    tbody tr { cursor: pointer; }
+    .col-num { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    td.desc { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .detalle-rep .campo { margin: 0 0 10px; }
+    .detalle-rep .campo b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); margin-bottom: 3px; }
+    .detalle-rep .caja { white-space: pre-wrap; }
+  </style>
+  <link rel="stylesheet" href="/css/theme.css?v=20261120f" />
+  <link rel="stylesheet" href="/css/hoja-fecha.css?v=20261104c" />
+</head>
+<body class="theme-panel">
+  <header>
+    <h1>Reportes</h1>
+    <div class="logo-centro">Meditechnosys<span>Medical Technology Solutions</span></div>
+    <span class="badge" id="badgeUsuario">…</span>
+    <div class="botones-nav">
+      <button class="boton-nav" onclick="window.location.href='/'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Regresar
+      </button>
+      <button class="boton-nav" onclick="window.location.href='/'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Home
+      </button>
+    </div>
+  </header>
+  <div class="fondo-logo" aria-hidden="true"></div>
+
+  <main class="page-wide">
+    <nav class="reportes-tabs" data-reportes-activo="estatus" aria-label="Apartados de Reportes">
+      <a class="reportes-tab" href="/admin/reportes/index.html" aria-current="page">Reportes de estatus</a>
+    </nav>
+    <section class="card">
+      <h2>Historial de reportes entregados</h2>
+      <p class="hint" style="margin-top:-6px">Todos los reportes de estatus entregados por los ingenieros se conservan aquí como histórico. Selecciona uno para ver el detalle completo y abrir el seguimiento del elemento.</p>
+
+      <div class="filtros">
+        <label>Ingeniero
+          <select id="fAutor"><option value="">Todos</option></select>
+        </label>
+        <label>Hospital
+          <select id="fHospital"><option value="">Todos</option></select>
+        </label>
+        <label>Desde
+          <input id="fDesde" type="date">
+        </label>
+        <label>Hasta
+          <input id="fHasta" type="date">
+        </label>
+        <label>Buscar
+          <input id="fTexto" type="search" placeholder="Elemento o descripción">
+        </label>
+      </div>
+      <div class="row-actions" style="margin-top:0">
+        <button class="btn-secondary" id="btnLimpiar">Limpiar filtros</button>
+        <button class="btn-primary" id="btnExcel">Descargar Excel</button>
+        <span class="hint" id="contador">…</span>
+      </div>
+
+      <p class="form-error" id="error" role="alert" hidden></p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Momento</th><th>Ingeniero</th><th>Elemento</th><th>Hospital</th><th>Estatus</th>
+              <th>Avance</th><th>Descripción del avance</th>
+            </tr>
+          </thead>
+          <tbody id="cuerpo"></tbody>
+        </table>
+      </div>
+      <p class="empty" id="vacio" hidden>No hay reportes que coincidan con los filtros.</p>
+    </section>
+  </main>
+
+  <script src="/js/gestion.js?v=20261123a"></script>
+  <script src="/js/hoja-fecha.js?v=20261106a"></script>
+  <script>
+  (function () {
+    'use strict';
+    // Regla de búsqueda compartida (/js/filtro.js): compara sin acentos ni mayúsculas.
+    var Busca = window.Filtro || { norm: function (x) { return String(x == null ? '' : x).toLowerCase(); } };
+    var todo = [];
+    var cuerpo = document.getElementById('cuerpo');
+    var error = document.getElementById('error');
+    var vacio = document.getElementById('vacio');
+    var contador = document.getElementById('contador');
+    var F = {
+      autor: document.getElementById('fAutor'),
+      hospital: document.getElementById('fHospital'),
+      desde: document.getElementById('fDesde'),
+      hasta: document.getElementById('fHasta'),
+      texto: document.getElementById('fTexto')
+    };
+
+    // Los dos campos de fecha se eligen con la hoja compartida (/js/hoja-fecha.js): un solo
+    // cuadro que admite Día, Mes, Año y Rango. Escribe en #fDesde/#fHasta en yyyy-mm-dd y
+    // dispara change, así que el filtrado de abajo sigue igual; el botón «Limpiar filtros»
+    // también la avisa porque pone los campos en vacío.
+    if (window.HojaFecha) {
+      HojaFecha.instalar({ desde: F.desde, hasta: F.hasta, titulo: 'Periodo', cualquier: 'Cualquier día' });
+    }
+
+    function filtrar() {
+      var t = Busca.norm(F.texto.value.trim());
+      var autor = F.autor.value, hospital = F.hospital.value, desde = F.desde.value, hasta = F.hasta.value;
+      return todo.filter(function (r) {
+        if (autor && r.autor !== autor) return false;
+        if (hospital && r.hospital !== hospital) return false;
+        if (t && Busca.norm((r.elemento || '') + ' ' + (r.descripcionAvance || '')).indexOf(t) < 0) return false;
+        var d = (r.momento || '').slice(0, 10);
+        if (desde && d < desde) return false;
+        if (hasta && d > hasta) return false;
+        return true;
+      });
+    }
+
+    function pintar(lista) {
+      cuerpo.innerHTML = '';
+      vacio.hidden = lista.length > 0;
+      contador.textContent = lista.length + ' reporte(s)';
+      lista.forEach(function (r) {
+        var tr = document.createElement('tr');
+        tr.dataset.id = r.id;
+        tr.innerHTML = '<td class="col-num"></td><td></td><td></td><td></td><td></td><td></td><td class="desc"></td>';
+        var c = tr.children;
+        c[0].textContent = Gestion.fmtFechaHora(r.momento);
+        c[1].textContent = r.autor;
+        c[2].textContent = r.elemento;
+        c[3].textContent = r.hospital || '—';
+        c[4].innerHTML = Gestion.badge('est-' + r.estado, Gestion.ESTADOS[r.estado] || r.estado);
+        c[5].innerHTML = Gestion.avanceHtml(r.avance);
+        c[6].textContent = r.descripcionAvance || '';
+        c[6].title = r.descripcionAvance || '';
+        cuerpo.appendChild(tr);
+      });
+    }
+
+    function repintar() { pintar(filtrar()); }
+    Object.keys(F).forEach(function (k) { F[k].addEventListener(k === 'texto' ? 'input' : 'change', repintar); });
+    document.getElementById('btnLimpiar').addEventListener('click', function () {
+      Object.keys(F).forEach(function (k) { F[k].value = ''; });
+      repintar();
+    });
+
+    // Descarga en Excel con los mismos filtros activos en pantalla.
+    var btnExcel = document.getElementById('btnExcel');
+    function queryExcel() {
+      var p = [];
+      function add(k, v) { if (v) p.push(encodeURIComponent(k) + '=' + encodeURIComponent(v)); }
+      add('autor', F.autor.value);
+      add('hospital', F.hospital.value);
+      add('desde', F.desde.value);
+      add('hasta', F.hasta.value);
+      add('texto', F.texto.value.trim());
+      return p.length ? '?' + p.join('&') : '';
+    }
+    btnExcel.addEventListener('click', function () {
+      Gestion.sinError(error);
+      btnExcel.disabled = true;
+      Gestion.descargar('/api/reportes/excel' + queryExcel())
+        .catch(function (e) { Gestion.error(error, 'No se pudo generar el Excel: ' + e.message); })
+        .finally(function () { btnExcel.disabled = false; });
+    });
+
+    function campo(nombre, valor) {
+      if (!valor) return '';
+      return '<div class="campo"><b>' + nombre + '</b><div class="caja">' + Gestion.esc(valor) + '</div></div>';
+    }
+
+    cuerpo.addEventListener('click', function (ev) {
+      var tr = ev.target.closest('tr[data-id]');
+      if (!tr) return;
+      var r = todo.find(function (x) { return String(x.id) === tr.dataset.id; });
+      if (!r) return;
+      var contenido =
+        '<div class="detalle-rep">' +
+          '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">' +
+            Gestion.badge('est-' + r.estado, Gestion.ESTADOS[r.estado] || r.estado) +
+            Gestion.avanceHtml(r.avance) +
+            (r.fechaEstimada ? '<span class="hint">Conclusión estimada: ' + Gestion.fmtFecha(r.fechaEstimada) + '</span>' : '') +
+          '</div>' +
+          campo('Descripción del avance', r.descripcionAvance) +
+          campo('Problemas encontrados', r.problemas) +
+          campo('Pendientes', r.pendientes) +
+          campo('Próximas acciones', r.proximasAcciones) +
+          campo('Comentarios adicionales', r.comentarios) +
+        '</div>';
+      Gestion.formDialog({
+        titulo: 'Reporte de estatus',
+        intro: r.elemento + (r.hospital ? ' · ' + r.hospital : '') + ' · ' + Gestion.fmtFechaHora(r.momento) + ' · ' + r.autor,
+        ancho: true,
+        contenidoHtml: contenido,
+        campos: [],
+        textoSubmit: 'Abrir seguimiento del elemento',
+        textoCancelar: 'Cerrar',
+        onSubmit: function () {
+          return Gestion.api('/api/actividades/' + r.itemId).then(function (item) {
+            Gestion.abrirDetalle(item, { onReload: cargar });
+          }).catch(function () { throw new Error('No se pudo abrir el elemento.'); });
+        }
+      });
+    });
+
+    function cargar() {
+      return Gestion.api('/api/reportes').then(function (lista) {
+        todo = lista || [];
+        var autores = {};
+        todo.forEach(function (r) { autores[r.autor] = true; });
+        var sel = F.autor;
+        while (sel.options.length > 1) sel.remove(1);
+        Object.keys(autores).sort().forEach(function (a) {
+          var o = document.createElement('option'); o.value = a; o.textContent = a; sel.appendChild(o);
+        });
+        repintar();
+      }).catch(function (e) { Gestion.error(error, 'No se pudieron cargar los reportes: ' + e.message); });
+    }
+
+    Gestion.init().then(function () {
+      document.getElementById('badgeUsuario').textContent =
+        Gestion.YO + ' · ' + Gestion.nombreRol(Gestion.ROL);
+      Gestion.opcionesHospital({ vacio: null }).forEach(function (o) {
+        var op = document.createElement('option'); op.value = o.v; op.textContent = o.t;
+        F.hospital.appendChild(op);
+      });
+      if (!Gestion.tiene('reportes.consultar')) Gestion.error(error, 'Tu rol no puede consultar los reportes de estatus.');
+      return cargar();
+    }).catch(function (e) { Gestion.error(error, e.message); });
+  })();
+  </script>
+<script src="/js/ubicacion.js"></script>
+</body>
+</html>

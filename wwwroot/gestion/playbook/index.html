@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <script src="/js/theme.js?v=20261119e"></script>
+  <script src="/js/filtro.js?v=20261029a"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Playbook — Intranet meditechnosys</title>
+  <link rel="stylesheet" href="/css/panel.css?v=20261123a" />
+  <style>
+    .col-acciones { white-space: nowrap; display: flex; gap: 6px; flex-wrap: wrap; }
+    .col-acciones button { padding: 4px 8px; font-size: .78rem; }
+    .doc-archivo { font-family: ui-monospace, Consolas, monospace; font-size: .8rem; }
+  </style>
+  <link rel="stylesheet" href="/css/theme.css?v=20261120f" />
+</head>
+<body class="theme-panel">
+  <header>
+    <h1>Playbook</h1>
+    <div class="logo-centro">Meditechnosys<span>Medical Technology Solutions</span></div>
+    <span class="badge" id="badgeUsuario">…</span>
+    <div class="botones-nav">
+      <button class="boton-nav" id="btnRegresar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Regresar
+      </button>
+      <button class="boton-nav" onclick="window.location.href='/calendario/index.html'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        Calendario
+      </button>
+    </div>
+  </header>
+  <div class="fondo-logo" aria-hidden="true"></div>
+
+  <main class="page-wide">
+    <section class="card">
+      <h2>Documentación técnica</h2>
+      <p class="hint" id="intro" style="margin-top:0">
+        Manuales, procedimientos y guías en PDF clasificados por hospital.
+      </p>
+
+      <div class="filtros">
+        <label>Buscar
+          <input id="fTexto" type="search" placeholder="Nombre, archivo, versión o quien lo subió">
+        </label>
+        <label>Hospital
+          <select id="fHospital"><option value="">Todos</option></select>
+        </label>
+        <label>Estado
+          <select id="fEstado">
+            <option value="">Todos</option>
+            <option value="Vigente">Vigente</option>
+            <option value="Retirado">Retirado</option>
+          </select>
+        </label>
+      </div>
+      <div class="row-actions" style="margin-top:0">
+        <button class="btn-primary" id="btnSubir" hidden>Subir documento</button>
+        <span class="hint" id="contador">…</span>
+      </div>
+
+      <p class="form-error" id="error" role="alert" hidden></p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nombre</th><th>Tipo</th><th>Hospital</th><th>Versión</th><th>Publicación</th>
+              <th>Actualización</th><th>Archivo PDF</th><th>Estado</th><th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="cuerpo"></tbody>
+        </table>
+      </div>
+      <p class="empty" id="vacio" hidden>No hay documentos que coincidan con el filtro.</p>
+    </section>
+  </main>
+
+  <script src="/js/gestion.js?v=20261123a"></script>
+  <script>
+  (function () {
+    'use strict';
+    // Regla de búsqueda compartida (/js/filtro.js): compara sin acentos ni mayúsculas.
+    var Busca = window.Filtro || { norm: function (x) { return String(x == null ? '' : x).toLowerCase(); } };
+    var G = window.Gestion;
+    var todo = [];
+    var cuerpo = document.getElementById('cuerpo');
+    var error = document.getElementById('error');
+    var vacio = document.getElementById('vacio');
+    var contador = document.getElementById('contador');
+    var fTexto = document.getElementById('fTexto');
+    var fHospital = document.getElementById('fHospital');
+    var fEstado = document.getElementById('fEstado');
+    var btnSubir = document.getElementById('btnSubir');
+
+    function llenaSelect(sel, valores) {
+      valores.forEach(function (v) {
+        var o = document.createElement('option'); o.value = v.v !== undefined ? v.v : v; o.textContent = v.t !== undefined ? v.t : v;
+        sel.appendChild(o);
+      });
+    }
+    function administra() { return G.tiene('playbook.administrar'); }
+    function rutaPdf(d) { return '/api/playbook/documentos/' + d.id + '/pdf'; }
+    var TIPOS_DOC = ['Manual', 'Procedimiento', 'Guía', 'Instructivo', 'Otro'];
+
+    function filtrar() {
+      var t = Busca.norm(fTexto.value.trim());
+      var h = fHospital.value, e = fEstado.value;
+      return todo.filter(function (d) {
+        if (h && d.hospital !== h) return false;
+        if (e && d.estado !== e) return false;
+        if (!t) return true;
+        return Busca.norm(d.nombre + ' ' + (d.tipo || '') + ' ' + d.nombreArchivo + ' ' + d.version + ' ' + d.subidoPor).indexOf(t) >= 0;
+      });
+    }
+
+    function boton(padre, texto, clase, fn) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = clase; b.textContent = texto;
+      b.addEventListener('click', fn);
+      padre.appendChild(b);
+      return b;
+    }
+
+    function pintar() {
+      var lista = filtrar();
+      cuerpo.innerHTML = '';
+      vacio.hidden = lista.length > 0;
+      contador.textContent = lista.length + ' documento(s)';
+      lista.forEach(function (d) {
+        var tr = document.createElement('tr');
+        function td(texto, clase) {
+          var e = document.createElement('td');
+          e.textContent = texto || '—';
+          if (clase) e.className = clase;
+          tr.appendChild(e);
+        }
+        td(d.nombre);
+        td(d.tipo);
+        td(d.hospital);
+        td(d.version);
+        td(d.fechaPublicacion ? G.fmtFecha(d.fechaPublicacion) : '—');
+        td(d.fechaActualizacion ? G.fmtFecha(d.fechaActualizacion) : '—');
+        td(d.nombreArchivo + ' · ' + Math.round((d.tamano || 0) / 1024) + ' KB', 'doc-archivo');
+        var ce = document.createElement('td');
+        ce.innerHTML = G.badge(d.estado === 'Vigente' ? 'est-Cerrada' : 'est-Cancelada', d.estado);
+        tr.appendChild(ce);
+
+        var acc = document.createElement('td');
+        acc.className = 'col-acciones';
+        boton(acc, 'Abrir', 'btn-secondary', function () { window.open(rutaPdf(d), '_blank'); });
+        boton(acc, 'Descargar', 'btn-secondary', function () {
+          G.sinError(error);
+          G.descargar(rutaPdf(d)).catch(function (e2) { G.error(error, e2.message); });
+        });
+        if (administra()) {
+          boton(acc, 'Editar', 'btn-primary', function () { abrirEditar(d); });
+          boton(acc, 'Archivo', 'btn-primary', function () { abrirReemplazar(d); });
+          boton(acc, 'Eliminar', 'btn-danger', function () { abrirEliminar(d); });
+        }
+        tr.appendChild(acc);
+        cuerpo.appendChild(tr);
+      });
+    }
+
+    function camposDocumento(d) {
+      return [
+        { name: 'nombre', label: 'Título del documento', value: d ? d.nombre : '', required: true, maxlength: 150 },
+        { name: 'tipo', label: 'Tipo de documento', tipo: 'select', required: true,
+          value: d ? (d.tipo || 'Otro') : '',
+          opciones: TIPOS_DOC.map(function (t) { return { v: t, t: t }; }) },
+        { name: 'version', label: 'Versión', value: d ? d.version : 'v1.0', required: true, maxlength: 20, hint: 'Cambiar la versión sella la fecha de actualización' },
+        { name: 'hospital', label: 'Hospital', tipo: 'select', value: d ? d.hospital : 'General', required: true, opciones: G.opcionesHospital({ general: true, vacio: null }) },
+        { name: 'fechaPublicacion', label: 'Fecha de publicación', tipo: 'date', required: true, value: d && d.fechaPublicacion ? d.fechaPublicacion.slice(0, 10) : '' },
+        { name: 'estado', label: 'Estado', tipo: 'select', value: d ? d.estado : 'Vigente', opciones: [{ v: 'Vigente', t: 'Vigente' }, { v: 'Retirado', t: 'Retirado' }] }
+      ];
+    }
+
+    function abrirSubir() {
+      G.formDialog({
+        titulo: 'Subir documento al Playbook',
+        intro: 'Solo se aceptan archivos PDF de hasta 20 MB. El sistema valida que el archivo sea un PDF real.',
+        ancho: true,
+        campos: camposDocumento(null).concat([
+          { name: 'archivo', label: 'Archivo PDF', tipo: 'file', accept: 'application/pdf,.pdf', required: true }
+        ]),
+        textoSubmit: 'Subir documento',
+        onSubmit: function (v) {
+          if (!v.archivo) return Promise.reject(new Error('Selecciona un archivo PDF.'));
+          var fd = new FormData();
+          fd.append('nombre', v.nombre);
+          fd.append('tipo', v.tipo);
+          fd.append('version', v.version);
+          fd.append('hospital', v.hospital);
+          fd.append('fechaPublicacion', v.fechaPublicacion || '');
+          fd.append('estado', v.estado);
+          fd.append('archivo', v.archivo, v.archivo.name);
+          return G.subir('/api/playbook/documentos', fd).then(cargar);
+        }
+      });
+    }
+
+    // Edición de metadatos: nombre, versión, hospital, fecha de publicación y estado.
+    // Nunca modifica el contenido del PDF.
+    function abrirEditar(d) {
+      G.formDialog({
+        titulo: 'Editar documento',
+        intro: d.nombreArchivo,
+        ancho: true,
+        contenidoHtml: '<div class="meta-grid">' +
+          '<div><b>Archivo</b>' + G.esc(d.nombreArchivo) + '</div>' +
+          '<div><b>Subido por</b>' + G.esc(d.subidoPor) + ' · ' + G.fmtFechaHora(d.subido) + '</div>' +
+          '</div>',
+        campos: camposDocumento(d),
+        textoSubmit: 'Guardar cambios',
+        onSubmit: function (v) {
+          return G.api('/api/playbook/documentos/' + d.id, {
+            method: 'PUT',
+            body: JSON.stringify({
+              nombre: v.nombre, tipo: v.tipo, version: v.version, hospital: v.hospital,
+              fechaPublicacion: v.fechaPublicacion ? v.fechaPublicacion + 'T00:00:00' : null,
+              estado: v.estado
+            })
+          }).then(cargar);
+        }
+      });
+    }
+
+    function abrirReemplazar(d) {
+      G.formDialog({
+        titulo: 'Reemplazar el archivo PDF',
+        intro: d.nombre + ' · ' + d.version + ' — se conserva la ficha y se sella la fecha de actualización.',
+        campos: [{ name: 'archivo', label: 'Nuevo archivo PDF', tipo: 'file', accept: 'application/pdf,.pdf', required: true }],
+        textoSubmit: 'Reemplazar archivo',
+        onSubmit: function (v) {
+          if (!v.archivo) return Promise.reject(new Error('Selecciona un archivo PDF.'));
+          var fd = new FormData();
+          fd.append('archivo', v.archivo, v.archivo.name);
+          return G.subir('/api/playbook/documentos/' + d.id + '/archivo', fd).then(cargar);
+        }
+      });
+    }
+
+    function abrirEliminar(d) {
+      G.formDialog({
+        titulo: '¿Está seguro de que desea eliminar este documento?',
+        intro: 'Esta acción eliminará el documento del Playbook.',
+        contenidoHtml: '<div class="meta-grid"><div><b>Documento</b>' + G.esc(d.nombre) +
+          '</div><div><b>Versión</b>' + G.esc(d.version) + '</div></div>',
+        campos: [],
+        textoCancelar: 'Cancelar',
+        textoSubmit: 'Eliminar',
+        claseSubmit: 'btn-danger',
+        onSubmit: function () {
+          return G.api('/api/playbook/documentos/' + d.id, { method: 'DELETE' }).then(cargar);
+        }
+      });
+    }
+
+    function cargar() {
+      return G.api('/api/playbook/documentos').then(function (lista) {
+        todo = lista || [];
+        pintar();
+      }).catch(function (e) { G.error(error, e.message); });
+    }
+
+    document.getElementById('btnRegresar').addEventListener('click', function () {
+      window.location.href = G.paginaRegreso();
+    });
+    fTexto.addEventListener('input', pintar);
+    fHospital.addEventListener('change', pintar);
+    fEstado.addEventListener('change', pintar);
+    btnSubir.addEventListener('click', function () { G.sinError(error); abrirSubir(); });
+
+    G.init().then(function () {
+      document.getElementById('badgeUsuario').textContent =
+        G.YO + ' · ' + G.nombreRol(G.ROL);
+      llenaSelect(fHospital, G.opcionesHospital({ general: true, vacio: null }));
+      btnSubir.hidden = !administra();
+      if (!administra()) {
+        document.getElementById('intro').textContent =
+          'Consulta y descarga la documentación técnica en PDF. Solo el Administrador puede subirla o modificarla.';
+      }
+      return cargar();
+    }).catch(function (e) { G.error(error, e.message); });
+  })();
+  </script>
+<script src="/js/ubicacion.js"></script>
+</body>
+</html>
