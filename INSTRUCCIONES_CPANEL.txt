@@ -1,0 +1,33 @@
+PORTAL INFORMATIVO PHP — MEDITECHNOSYS
+Versión 1.0.0
+
+REQUISITOS
+- cPanel con PHP 7.4 o superior.
+- No requiere SSH, base de datos, ASP.NET, servicios ni puertos abiertos.
+
+INSTALACIÓN
+1. Abre el Administrador de archivos de cPanel.
+2. Entra a public_html o a la subcarpeta elegida.
+3. Sube intranet-cpanel.zip.
+4. Extrae el ZIP en esa misma carpeta.
+5. Confirma que index.php esté en la raíz de la carpeta publicada.
+6. Selecciona PHP 7.4 o superior en MultiPHP Manager.
+7. Abre el dominio.
+
+QUÉ DEBE APARECER
+- Encabezado "Sistemas médicos".
+- Cuatro tarjetas informativas.
+- Ningún botón "Abrir".
+- Ningún formulario clínico.
+
+PERMISOS RECOMENDADOS
+- Carpetas: 755.
+- Archivos: 644.
+
+SI ALGO FALLA
+- Si index.php se descarga: activa PHP 7.4 o superior para el dominio.
+- Si no se ven estilos: confirma que assets/css/portal.css existe junto a index.php.
+- Si aparece 404: verifica que el ZIP se extrajo en la carpeta correcta.
+
+Esta versión es solo un catálogo informativo. No conecta con Patología,
+PACS, DICOM, lista de trabajo ni bases de datos.
