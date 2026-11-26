@@ -1,0 +1,14 @@
+{
+  "name": "meditechnosys-portal-nodejs",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Portal informativo de meditechnosys para cPanel AI App Hosting",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED"
+}

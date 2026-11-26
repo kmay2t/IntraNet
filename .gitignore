@@ -12,6 +12,8 @@
 
 # Dependencies
 /vendor/
+/nodejs/node_modules/
+npm-debug.log*
 
 # IDEs
 .vs/

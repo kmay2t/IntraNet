@@ -1,54 +1,72 @@
 # Meditechnosys — Portal informativo
 
-Portal web básico renderizado con PHP que muestra el catálogo de **Sistemas médicos**.
+Portal web autocontenido que muestra el catálogo actual de **Sistemas médicos**. Está disponible en dos versiones: PHP para hosting compartido y Node.js para **cPanel AI App Hosting**.
 
 ## Alcance
 
-- Cuatro tarjetas informativas: consulta de reportes, visor DICOM, envío DICOM y consulta de lista de trabajo.
-- No incluye botones «Abrir», enlaces a sistemas clínicos, formularios, JavaScript ni APIs.
-- No requiere inicio de sesión, base de datos, Composer, procesos en segundo plano ni conexión con el PACS.
-- Las rutas y los archivos de la versión ASP.NET se retiraron del proyecto.
+- Once tarjetas informativas con el contenido actual del portal.
+- No incluye botones «Abrir», enlaces a sistemas clínicos, formularios, JavaScript ni APIs JSON.
+- No requiere inicio de sesión, base de datos, Composer, paquetes npm ni conexión con el PACS.
+- La versión Node.js usa únicamente módulos incluidos en Node.js.
 
-## Requisitos
-
-- PHP 7.4 o superior.
-- Apache con PHP o cualquier servidor compatible que sirva archivos `.php`.
-- No se necesitan extensiones adicionales.
-
-## Estructura
+## Archivos de entrega
 
 ```text
 .
-├── index.php                 # Portada y catálogo informativo
-├── assets/
-│   ├── favicon.ico
-│   ├── css/portal.css        # Tema azul marino y dorado
-│   └── img/synapse.png       # Emblema de fondo
+├── index.php                 # Portada PHP
+├── assets/                   # Recursos de la versión PHP
 ├── .htaccess                 # Seguridad básica para Apache
-└── intranet-cpanel.zip       # Paquete listo para subir a cPanel
+├── intranet-cpanel.zip       # Paquete PHP para Administrador de archivos
+├── nodejs/
+│   ├── app.js                # Servidor Node.js
+│   ├── package.json          # Inicio con npm start
+│   ├── package-lock.json
+│   └── public/               # HTML, CSS e imágenes de la versión Node.js
+└── intranet-nodejs.zip       # Paquete para cPanel AI App Hosting
 ```
 
 ## Probar localmente
 
-Desde la carpeta del proyecto:
+### PHP
 
 ```bash
 php -S localhost:8080
 ```
 
-Después abre `http://localhost:8080`.
+Abre `http://localhost:8080`.
 
-## Publicar en cPanel
+### Node.js
 
-1. Entra al **Administrador de archivos** de cPanel.
-2. Sube `intranet-cpanel.zip` a `public_html` o a la subcarpeta elegida.
-3. Extrae el ZIP en esa misma carpeta.
-4. Comprueba que `index.php` quede en la raíz de la carpeta publicada.
-5. Selecciona PHP 7.4 o superior en la configuración del dominio.
-6. Abre el dominio y verifica que aparezcan las cuatro tarjetas sin botones.
+```bash
+cd nodejs
+npm start
+```
 
-No hace falta crear bases de datos, abrir puertos, instalar servicios ni ejecutar comandos por SSH.
+Abre `http://localhost:3000`. Para usar otro puerto, define la variable `PORT`.
+
+## Publicar Node.js en cPanel
+
+1. En **Sitios web**, inicia la creación de un sitio y selecciona **AI App Hosting**.
+2. Pulsa **Continuar**.
+3. En **Origen**, selecciona **Subir un archivo**.
+4. Sube `intranet-nodejs.zip`.
+5. Espera a que termine la implementación y abre la dirección HTTPS que genere cPanel.
+
+No uses **WordPress**, **SITEJET** ni **Repositorio Git**. Tampoco pegues la URL de ejemplo de GitHub. La aplicación ya incluye `package.json` y el comando de inicio `npm start`.
+
+## Publicar PHP en cPanel
+
+Esta opción es para un hosting compartido con PHP:
+
+1. Abre **Administrador de archivos**.
+2. Entra a `public_html` o a la subcarpeta del dominio.
+3. Sube y extrae `intranet-cpanel.zip`.
+4. Comprueba que `index.php` y `assets` queden juntos.
+5. Selecciona PHP 7.4 o superior en **MultiPHP Manager**.
+6. Abre el dominio.
+
+El asistente **«Implementar una aplicación de Node.js»** no debe usarse para el paquete PHP.
 
 ## Versión
 
-1.0.0 — Portal informativo PHP.
+1.0.0 — Portal informativo PHP y Node.js.

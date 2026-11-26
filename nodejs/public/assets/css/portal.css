@@ -1,0 +1,302 @@
+:root {
+  color-scheme: dark;
+  --bg: #05080f;
+  --surface: #0b1426;
+  --surface-2: #10203d;
+  --line: #1e3358;
+  --accent: #c9a24b;
+  --accent-hi: #e6c46e;
+  --text: #f2f4f8;
+  --text-dim: #9aa8c2;
+  --radius: 8px;
+  --page-width: 1240px;
+  --font-display: "Arial Narrow", "Roboto Condensed", "Segoe UI", sans-serif;
+  --font-body: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  --background: radial-gradient(120% 90% at 50% 0%, #14263f 0%, #0d1a2e 45%, #070f1c 100%);
+  --circuit: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280' viewBox='0 0 280 280' fill='none'%3E%3Cg stroke='%236aa6ec' stroke-opacity='.16' stroke-width='1' stroke-linecap='square'%3E%3Cpath d='M8 44h44l18-18h56l14 14h48'/%3E%3Cpath d='M248 20h-38l-16 16v42l-14 14H118'/%3E%3Cpath d='M20 268v-44l22-22h50v-30h40'/%3E%3Cpath d='M268 260h-46l-18-18h-40l-16 16h-48'/%3E%3Cpath d='M74 128h56l16-16h60'/%3E%3Cpath d='M150 232v-34l-20-20H60'/%3E%3Cpath d='M4 148h36l18 18h52'/%3E%3Cpath d='M276 118h-32l-20 20v40'/%3E%3Cpath d='M112 4v40l18 18'/%3E%3C/g%3E%3Cg stroke='%23d4af37' stroke-opacity='.24' stroke-width='1'%3E%3Cpath d='M0 96h70l20 20h72l20-20h78'/%3E%3Cpath d='M190 280v-46l-18-18v-40'/%3E%3C/g%3E%3Cg fill='%236aa6ec' fill-opacity='.24'%3E%3Ccircle cx='230' cy='44' r='2.5'/%3E%3Ccircle cx='14' cy='242' r='2.5'/%3E%3Ccircle cx='264' cy='180' r='2.5'/%3E%3Ccircle cx='96' cy='10' r='2.5'/%3E%3C/g%3E%3Cg fill='%23d4af37' fill-opacity='.30'%3E%3Ccircle cx='92' cy='116' r='3'/%3E%3Ccircle cx='196' cy='214' r='3'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: var(--bg);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--text);
+  background: var(--background);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  position: relative;
+  isolation: isolate;
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+body::before {
+  background: url("../img/synapse.png") center / contain no-repeat;
+  opacity: .28;
+}
+
+body::after {
+  background-image: var(--circuit);
+  background-repeat: repeat;
+  opacity: .82;
+}
+
+.shell {
+  width: min(var(--page-width), calc(100% - 64px));
+  margin-inline: auto;
+  padding-block: 0 48px;
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding-block: 24px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  display: grid;
+  gap: 2px;
+}
+
+.brand-name {
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.brand-name span {
+  color: var(--accent);
+}
+
+.brand-subtitle {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.internal-badge {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: .7rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 5px 10px;
+}
+
+.medical-systems {
+  padding-top: 42px;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.section-heading h1 {
+  flex: 0 0 auto;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+.section-heading::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: linear-gradient(90deg, var(--line), transparent);
+}
+
+.section-intro {
+  margin: 10px 0 28px;
+  color: var(--text-dim);
+  font-size: .9rem;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.card {
+  min-height: 252px;
+  margin: 0;
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: rgba(16, 32, 61, .74);
+  border: 1px solid var(--line);
+  border-top-color: rgba(201, 162, 75, .58);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .14);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+}
+
+.card-tag {
+  margin: 0;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  line-height: 1.4;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+
+.card h2 {
+  margin: 18px 0 12px;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: .01em;
+  text-wrap: balance;
+}
+
+.card-description {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: .92rem;
+  line-height: 1.65;
+}
+
+.site-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 52px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: .72rem;
+}
+
+@media (max-width: 940px) {
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .shell {
+    width: min(var(--page-width), calc(100% - 32px));
+    padding-bottom: 32px;
+  }
+
+  .site-header {
+    align-items: flex-start;
+    padding-top: 20px;
+  }
+
+  .medical-systems {
+    padding-top: 32px;
+  }
+
+  .cards {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .card {
+    min-height: 0;
+    padding: 22px;
+  }
+
+  .site-footer {
+    margin-top: 36px;
+  }
+}
+
+@media print {
+  :root,
+  html,
+  body {
+    color-scheme: light;
+    background: #fff;
+  }
+
+  body {
+    color: #111;
+    background: #fff;
+  }
+
+  body::before,
+  body::after {
+    display: none;
+  }
+
+  .shell {
+    width: 100%;
+    padding: 0;
+  }
+
+  .site-header,
+  .section-heading::after,
+  .site-footer {
+    border-color: #888;
+  }
+
+  .brand-name span,
+  .section-heading h1,
+  .card h2 {
+    color: #111;
+  }
+
+  .brand-subtitle,
+  .internal-badge,
+  .section-intro,
+  .card-tag,
+  .card-description,
+  .site-footer {
+    color: #444;
+  }
+
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card {
+    background: #fff;
+    border-color: #888;
+    box-shadow: none;
+    break-inside: avoid;
+  }
+}

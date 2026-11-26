@@ -6,6 +6,10 @@
 - Acceso al Administrador de archivos o a FTP.
 - No se requiere SSH, base de datos, sistema de colas ni proxy inverso.
 
+## Importante: no usar el asistente de Node.js
+
+La pantalla **«Implementar una aplicación de Node.js»** no sirve para este portal. El proyecto es PHP, no incluye `package.json` ni un servidor Node.js y debe publicarse con el **Administrador de archivos** o FTP. No pegues una URL de Git ni continúes ese asistente.
+
 ## Pasos
 
 1. Abre el Administrador de archivos de cPanel.

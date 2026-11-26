@@ -5,6 +5,10 @@ REQUISITOS
 - cPanel con PHP 7.4 o superior.
 - No requiere SSH, base de datos, ASP.NET, servicios ni puertos abiertos.
 
+IMPORTANTE
+- No uses el asistente "Implementar una aplicación de Node.js".
+- Este proyecto es PHP y se publica con el Administrador de archivos o FTP.
+
 INSTALACIÓN
 1. Abre el Administrador de archivos de cPanel.
 2. Entra a public_html o a la subcarpeta elegida.
